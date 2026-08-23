@@ -132,6 +132,18 @@ function toggleStatus(dateKey, roomNumber) {
 }
 
 function computeStats(dateKey) {
+  if (isBreakfast8Mode()) {
+    let hot = 0, normal = 0, addon = 0, completed = 0;
+    for (const r of state.rooms) {
+      if (isAddon(r)) addon++;
+      else if (isHotMeal(r)) hot++;
+      else if (isNormalMeal(r)) normal++;
+      else normal++; // 續住不加購等歸一般
+      if (getStatus(dateKey, r.roomNumber) === STATUS.COMPLETED) completed++;
+    }
+    const total = state.rooms.length;
+    return { hot, normal, addon, completed, pending: total - completed, total };
+  }
   let hot = 0, normal = 0, completed = 0;
   for (const r of state.rooms) {
     if (r.breakfastType === 'hot') hot++;
@@ -165,6 +177,7 @@ function render() {
 
   $('statHot').textContent = s.hot;
   $('statNormal').textContent = s.normal;
+  if ($('statAddon')) $('statAddon').textContent = s.addon ?? 0;
   $('statDone').textContent = s.completed;
   $('statPending').textContent = s.pending;
 
@@ -174,57 +187,94 @@ function render() {
 
   // 熱食警示橫幅
   const banner = $('hotAlertBanner');
-  const hotPending = state.rooms.filter(r => r.breakfastType === 'hot' && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
+  let hotPending = 0;
+  if (isBreakfast8Mode()) hotPending = state.rooms.filter(r => isHotMeal(r) && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
+  else hotPending = state.rooms.filter(r => r.breakfastType === 'hot' && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
   banner.classList.remove('hidden');
   if (hotPending > 0) {
-    banner.textContent = `🔥 尚有 ${hotPending} 間熱食未用餐，點此查看`;
+    banner.textContent = `🔥 尚有 ${hotPending} 間熟食未用餐`;
     banner.className = 'hot-banner alert';
   } else {
-    banner.textContent = s.hot > 0 ? '🔥✅ 熱食已全數用餐完成' : '🥐 今日尚無熱食房號';
+    banner.textContent = s.hot > 0 ? '🔥✅ 熟食已全數用餐完成' : '🥐 今日尚無熟食房號';
     banner.className = 'hot-banner ok';
   }
 
   // 空白狀態
   const empty = state.rooms.length === 0;
   $('emptyState').classList.toggle('hidden', !empty);
-  $('filterChips').classList.toggle('hidden', empty);
+  // 8欄模式兩欄同時顯示，不用 chips 篩選
+  if (isBreakfast8Mode()) $('filterChips').classList.add('hidden');
+  else $('filterChips').classList.toggle('hidden', empty);
   banner.classList.toggle('hidden', empty);
 
   renderGrid(tk);
 }
 
 function isBreakfast8Mode() { return state.rooms.length && state.rooms[0] && 'adult' in state.rooms[0]; }
+let mealEditTarget = null;
+function isAddon(r) { return r.eggMilk === '加購'; }
+function isHotMeal(r) { return !isAddon(r) && !!(r.adult || r.child) && r.vegan !== '不加購'; }
+function isNormalMeal(r) { return r.vegan === '不加購'; }
 function renderGrid(tk) {
   const grid = $('roomGrid');
-  const rooms = filterRooms(tk, currentFilter);
-  // 8欄表格模式
+  // 8欄兩欄模式：熟食｜一般 每房一橫排
   if (isBreakfast8Mode()) {
-    const rows = rooms.map(r => {
+    const all = sortRooms(state.rooms);
+    const hotList = all.filter(r => isHotMeal(r) || isAddon(r));
+    const normalList = all.filter(isNormalMeal);
+    // 已/未用餐同時顯示，僅用樣式區分
+    const mkRow = (r) => {
       const st = getStatus(tk, r.roomNumber);
       const done = st === STATUS.COMPLETED;
-      const adult = r.adult || '', child = r.child || '';
-      const hasMeal = !!(adult || child);
-      const meal = hasMeal ? `${adult}/${child}` : (r.vegan === '不加購' ? '不加購' : '-');
-      const statusBadge = r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:2px 6px;border-radius:999px;font-size:12px">${escapeHtml(r.status)}</span>` : '';
-      return `<tr class="${done ? 'row-done' : ''}" data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer">
-        <td><b>${escapeHtml(r.roomNumber)}</b></td>
-        <td>${escapeHtml(r.source || '')}</td>
-        <td>${statusBadge}</td>
-        <td>${escapeHtml(r.eggMilk || '')}</td>
-        <td>${escapeHtml(r.vegan || '')}</td>
-        <td style="text-align:center">${escapeHtml(adult)}</td>
-        <td style="text-align:center">${escapeHtml(child)}</td>
-        <td>${escapeHtml(r.mealTime || '')}</td>
-        <td>${done ? '✅' : '⏳'}</td>
+      const isAdd = isAddon(r);
+      return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}">
+        <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${isAdd ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : ''}</td>
+        <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
+        <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
+        <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}</td>
+        <td style="font-size:12px">${escapeHtml(r.vegan || '')}</td>
+        <td style="text-align:center;font-weight:700">${escapeHtml(r.adult || '')}</td>
+        <td style="text-align:center">${escapeHtml(r.child || '')}</td>
+        <td style="font-size:12px">${escapeHtml(r.mealTime || '')}</td>
+        <td style="text-align:center">${done ? '✅' : '⏳'}</td>
       </tr>`;
-    }).join('');
-    grid.innerHTML = `<div style="overflow:auto;background:var(--card);border-radius:16px;box-shadow:0 2px 5px rgba(0,0,0,.07)"><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:#f1f3f5"><th style="padding:10px 6px">房號</th><th>來源</th><th>狀態</th><th>蛋奶素</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan=9 style="text-align:center;padding:24px;color:#868e96">無資料</td></tr>'}</tbody></table></div>`;
-    // 點列切換用餐
+    };
+    const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
+    const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無一般</td></tr>';
+    // 上方四按鈕同時顯示，不做單欄篩選 - 僅顯示數字
+    grid.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
+          <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
+          <div style="overflow:auto;max-height:62vh">
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
+          <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">一般</div>
+          <div style="overflow:auto;max-height:62vh">
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
+          </div>
+        </div>
+      </div>`;
+    // 點排切換已用餐 / 不加購可改
     grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', () => {
+      const room = state.rooms.find(x => x.roomNumber === tr.dataset.room);
+      if (!room) return;
+      // 不加購 → 先改加購
+      if (room.vegan === '不加購') {
+        mealEditTarget = room.roomNumber;
+        $('mealEditTitle').textContent = `房號 ${room.roomNumber} 改為加購`;
+        $('mealEditHint').textContent = `來源：${room.source || ''}　此房原為不加購，改為加購後請輸入大人小孩數量`;
+        $('mealAdultInput').value = room.adult || '';
+        $('mealChildInput').value = room.child || '';
+        openModal('mealEditModal');
+        return;
+      }
       const next = toggleStatus(tk, tr.dataset.room);
+      if (navigator.vibrate) navigator.vibrate(next === STATUS.COMPLETED ? 20 : 8);
       toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
     }));
-    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.filter === currentFilter));
     return;
   }
   const html = rooms.map(r => {
@@ -696,6 +746,25 @@ function bindEvents() {
     render();
     closeModal('roomModal');
     toast(`已刪除房號 ${roomModalTarget}`);
+  });
+
+  // 不加購改加購
+  $('mealCancelBtn').addEventListener('click', () => { mealEditTarget = null; closeModal('mealEditModal'); });
+  $('mealSaveBtn').addEventListener('click', () => {
+    const room = state.rooms.find(r => r.roomNumber === mealEditTarget);
+    if (!room) return;
+    const a = $('mealAdultInput').value.trim();
+    const c = $('mealChildInput').value.trim();
+    if (a === '' && c === '') { toast('請輸入大人或小孩數量'); return; }
+    room.eggMilk = '加購';
+    room.vegan = '';
+    room.adult = a;
+    room.child = c;
+    saveState();
+    closeModal('mealEditModal');
+    mealEditTarget = null;
+    render();
+    toast(`✅ ${room.roomNumber} 已改為加購 ${a}/${c}`);
   });
 }
 

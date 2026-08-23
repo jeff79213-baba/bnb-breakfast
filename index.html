@@ -27,14 +27,18 @@
 <main>
   <!-- 統計區 -->
   <section class="stats-section">
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
       <button class="stat-card hot" data-filter="hot">
         <span class="stat-num" id="statHot">0</span>
-        <span class="stat-label">🔥 熱食</span>
+        <span class="stat-label">🔥 熟食</span>
       </button>
       <button class="stat-card normal" data-filter="normal">
         <span class="stat-num" id="statNormal">0</span>
         <span class="stat-label">🥐 一般</span>
+      </button>
+      <button class="stat-card addon" data-filter="addon" style="border-top:3px solid #fcc419">
+        <span class="stat-num" id="statAddon" style="color:#e67700">0</span>
+        <span class="stat-label">💰 加購</span>
       </button>
       <button class="stat-card done" data-filter="completed">
         <span class="stat-num" id="statDone">0</span>
@@ -134,6 +138,23 @@
       <button class="btn primary" id="roomSaveBtn">儲存</button>
     </div>
     <button class="btn subtle full" id="roomCloseBtn">取消</button>
+  </div>
+</div>
+
+<!-- 不加購改加購 -->
+<div class="modal-backdrop hidden" id="mealEditModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="mealEditTitle">修改用餐</h2>
+    <p class="hint" id="mealEditHint"></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+      <label>大人 <input type="number" id="mealAdultInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
+      <label>小孩 <input type="number" id="mealChildInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
+    </div>
+    <div class="row-actions">
+      <button class="btn" id="mealCancelBtn">取消</button>
+      <button class="btn primary" id="mealSaveBtn">確認改為加購</button>
+    </div>
   </div>
 </div>
 
