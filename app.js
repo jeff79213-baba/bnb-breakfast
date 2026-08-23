@@ -185,17 +185,17 @@ function render() {
   const pct = s.total ? Math.round(s.completed / s.total * 100) : 0;
   $('progressBar').style.width = pct + '%';
 
-  // 熱食警示橫幅
+  // 熟食警示橫幅（簡約線條）
   const banner = $('hotAlertBanner');
   let hotPending = 0;
   if (isBreakfast8Mode()) hotPending = state.rooms.filter(r => isHotMeal(r) && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
   else hotPending = state.rooms.filter(r => r.breakfastType === 'hot' && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
   banner.classList.remove('hidden');
   if (hotPending > 0) {
-    banner.textContent = `🔥 尚有 ${hotPending} 間熟食未用餐`;
+    banner.textContent = `尚有 ${hotPending} 間熟食未用餐`;
     banner.className = 'hot-banner alert';
   } else {
-    banner.textContent = s.hot > 0 ? '🔥✅ 熟食已全數用餐完成' : '🥐 今日尚無熟食房號';
+    banner.textContent = s.hot > 0 ? '熟食已全數用餐完成' : '今日尚無熟食房號';
     banner.className = 'hot-banner ok';
   }
 
@@ -235,12 +235,12 @@ function renderGrid(tk) {
         <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${isAdd ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : ''}</td>
         <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
         <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
-        <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}</td>
+        <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}${isAdd ? `<button data-revert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
         <td style="font-size:12px">${escapeHtml(r.vegan || '')}${isNoAdd ? `<button data-addon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
         <td style="text-align:center;font-weight:700">${escapeHtml(r.adult || '')}</td>
         <td style="text-align:center">${escapeHtml(r.child || '')}</td>
         <td style="font-size:12px">${escapeHtml(r.mealTime || '')}</td>
-        <td style="text-align:center">${done ? '✅' : '⏳'}</td>
+        <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
       </tr>`;
     };
     const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
@@ -277,7 +277,20 @@ function renderGrid(tk) {
       $('mealEditHint').textContent = `來源：${room.source || ''}　此房原為不加購，改為加購後請輸入大人小孩數量`;
       $('mealAdultInput').value = room.adult || '';
       $('mealChildInput').value = room.child || '';
+      $('mealSaveBtn').textContent = '確認改為加購';
       openModal('mealEditModal');
+    }));
+    grid.querySelectorAll('[data-revert]').forEach(btn => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const room = state.rooms.find(x => x.roomNumber === btn.dataset.revert);
+      if (!room) return;
+      if (!confirm(`房號 ${room.roomNumber} 要改回不加購嗎？`)) return;
+      room.eggMilk = '';
+      room.vegan = '不加購';
+      room.adult = '';
+      room.child = '';
+      saveState(); render();
+      toast(`↩️ ${room.roomNumber} 已改回不加購`);
     }));
     return;
   }

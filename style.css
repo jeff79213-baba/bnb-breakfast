@@ -317,10 +317,16 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* 簡約線條圖示 */
+.dot { display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:4px }
+.line-check { display:inline-block;width:12px;height:7px;border-left:2px solid #1971c2;border-bottom:2px solid #1971c2;transform:rotate(-45deg);vertical-align:middle;margin-right:4px;position:relative;top:-1px }
+.line-pending { display:inline-block;width:10px;height:10px;border:2px solid #e67700;border-radius:50%;vertical-align:middle;margin-right:4px;position:relative }
+.line-pending::after { content:'';position:absolute;left:3px;top:2px;width:2px;height:4px;border-right:1px solid #e67700;border-bottom:1px solid #e67700;transform:rotate(35deg) }
+
 /* 平板／桌面 */
 @media (min-width: 768px) {
   main { padding-top: 20px; }
-  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+  .stats-grid { grid-template-columns: repeat(5, 1fr) !important; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
   .chips { top: calc(env(safe-area-inset-top) + 74px); }
 }
