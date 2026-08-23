@@ -367,31 +367,98 @@ function parseImport(text) {
   return { rows, issues, delim, hasHeader };
 }
 
+// ===== Excel 解析（新增：支援 .xlsx / .xls 二進位）=====
+function isExcelFile(file) {
+  return /\.xlsx?$/i.test(file.name || '');
+}
+
+function parseFromMatrix(matrix) {
+  if (!matrix || !matrix.length) return null;
+  // 正規化為字串二維陣列，並過濾全空白列
+  const norm = matrix.map(row => (Array.isArray(row) ? row : [row]).map(c => String(c ?? '').trim()));
+  const rows2d = norm.filter(r => r.some(c => c !== ''));
+  if (!rows2d.length) return null;
+
+  const first = rows2d[0];
+  const hasHeader = first.some(c => /房|room/i.test(c) || /早|餐|類|type|breakfast/i.test(c));
+  let roomCol = 0, typeCol = 1, startIdx = 0;
+  if (hasHeader) {
+    roomCol = first.findIndex(c => /房|room/i.test(c));
+    typeCol = first.findIndex(c => /早|餐|類|type|breakfast/i.test(c));
+    if (roomCol < 0) roomCol = 0;
+    if (typeCol < 0) typeCol = roomCol === 0 ? 1 : 0;
+    startIdx = 1;
+  }
+
+  const rows = [], issues = [];
+  const seen = new Set();
+  for (let i = startIdx; i < rows2d.length; i++) {
+    const cells = rows2d[i];
+    const no = normalizeRoomNo(cells[roomCol]);
+    const rawType = cells[typeCol] ?? '';
+    if (!no) { issues.push(`第 ${i + 1} 列：房號空白，已略過`); continue; }
+    const t = mapBreakfast(rawType);
+    if (!t) { issues.push(`第 ${i + 1} 列：「${rawType || '空白'}」無法判斷早餐種類，已略過`); continue; }
+    if (seen.has(no)) { issues.push(`第 ${i + 1} 列：房號 ${no} 重複，以最後一筆為準`); }
+    seen.add(no);
+    rows.push({ roomNumber: no, breakfastType: t, rawType });
+  }
+  return { rows, issues, hasHeader };
+}
+
+async function parseExcelFile(file) {
+  if (typeof XLSX === 'undefined') {
+    throw new Error('XLSX 未載入：請確認網路連線後重新整理');
+  }
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+  if (!wb.SheetNames.length) throw new Error('Excel 無工作表');
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  // header:1 取得二維陣列，defval 確保空白儲存格不被跳過
+  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false, blankrows: false });
+  return parseFromMatrix(matrix);
+}
+
+function showImportPreview(parsed) {
+  importDraft = parsed;
+  const hotCount = parsed.rows.filter(r => r.breakfastType === 'hot').length;
+  $('importSummary').innerHTML =
+    `共判讀到 <b>${parsed.rows.length}</b> 筆房號<br>` +
+    `🔥 熱食 ${hotCount} 間　🥐 一般 ${parsed.rows.length - hotCount} 間`;
+  $('importIssues').innerHTML = parsed.issues.slice(0, 8)
+    .map(i => `<div class="issue">${escapeHtml(i)}</div>`).join('')
+    + (parsed.issues.length > 8 ? `<div class="issue">…另有 ${parsed.issues.length - 8} 項提示</div>` : '');
+  $('importPreviewList').innerHTML = parsed.rows.slice(0, 30).map(r => {
+    const info = typeInfo(r.breakfastType);
+    return `<div class="pv-row"><b>${escapeHtml(r.roomNumber)}</b><span>${info.emoji} ${info.label}</span></div>`;
+  }).join('') + (parsed.rows.length > 30 ? `<div class="pv-row hint">…其餘 ${parsed.rows.length - 30} 筆</div>` : '');
+  closeModal('menuModal');
+  openModal('importModal');
+}
+
 function handleFile(file) {
+  if (isExcelFile(file)) {
+    parseExcelFile(file).then(parsed => {
+      if (!parsed || !parsed.rows.length) {
+        toast(`❌ 無法從 Excel 判讀出房號資料${parsed?.issues?.length ? '：' + parsed.issues[0] : '（請確認第一欄為房號、第二欄為早餐種類：熱食/一般）'}`, 4000);
+        return;
+      }
+      showImportPreview(parsed);
+    }).catch(err => {
+      console.error(err);
+      const msg = err && err.message ? err.message : '檔案讀取失敗';
+      toast(`❌ Excel 讀取失敗：${msg}`, 4000);
+    });
+    return;
+  }
+  // CSV / TXT 舊邏輯
   readFileSmart(file).then(text => {
     const parsed = parseImport(text);
     if (!parsed || !parsed.rows.length) {
       toast(`❌ 無法從檔案判讀出房號資料${parsed?.issues?.length ? '：' + parsed.issues[0] : ''}`, 4000);
       return;
     }
-    importDraft = parsed;
-    const hotCount = parsed.rows.filter(r => r.breakfastType === 'hot').length;
-
-    $('importSummary').innerHTML =
-      `共判讀到 <b>${parsed.rows.length}</b> 筆房號<br>` +
-      `🔥 熱食 ${hotCount} 間　🥐 一般 ${parsed.rows.length - hotCount} 間`;
-
-    $('importIssues').innerHTML = parsed.issues.slice(0, 8)
-      .map(i => `<div class="issue">${escapeHtml(i)}</div>`).join('')
-      + (parsed.issues.length > 8 ? `<div class="issue">…另有 ${parsed.issues.length - 8} 項提示</div>` : '');
-
-    $('importPreviewList').innerHTML = parsed.rows.slice(0, 30).map(r => {
-      const info = typeInfo(r.breakfastType);
-      return `<div class="pv-row"><b>${escapeHtml(r.roomNumber)}</b><span>${info.emoji} ${info.label}</span></div>`;
-    }).join('') + (parsed.rows.length > 30 ? `<div class="pv-row hint">…其餘 ${parsed.rows.length - 30} 筆</div>` : '');
-
-    closeModal('menuModal');
-    openModal('importModal');
+    showImportPreview(parsed);
   }).catch(() => toast('❌ 檔案讀取失敗'));
 }
 

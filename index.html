@@ -85,7 +85,7 @@
     <div class="sheet-handle"></div>
     <h2>功能選單</h2>
     <button class="btn list-btn" id="menuManageBtn">🏠 管理房號</button>
-    <button class="btn list-btn" id="menuImportBtn">📂 匯入資料（CSV / Excel 另存 CSV）</button>
+    <button class="btn list-btn" id="menuImportBtn">📂 匯入資料（Excel / CSV）</button>
     <button class="btn list-btn" id="menuExportBtn">📤 匯出今日紀錄</button>
     <button class="btn list-btn subtle" id="menuCloseBtn">關閉</button>
   </div>
@@ -137,10 +137,11 @@
   </div>
 </div>
 
-<input type="file" id="fileInput" accept=".csv,.txt,.tsv" hidden>
+<input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt,.tsv" hidden>
 
 <div id="toast" class="toast hidden"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
