@@ -1,0 +1,16 @@
+民宿早餐房號管理系統
+═══════════════════════════════
+
+GitHub：
+https://github.com/jeff79213-baba/bnb-breakfast
+
+手機／平板開啟（GitHub Pages）：
+https://jeff79213-baba.github.io/bnb-breakfast/
+
+iPhone 加到主畫面（變成 App 捷徑）：
+1. 用 Safari 打開上面的網址
+2. 點「分享」按鈕 → 「加入主畫面」
+3. 名稱填「早餐管理」→ 新增
+
+※ 本系統為離線優先：資料只存在裝置本機，不上傳雲端。
+※ 第一次開啟後會自動快取，之後沒有網路也能用。
