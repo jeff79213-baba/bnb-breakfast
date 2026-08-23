@@ -1,0 +1,16 @@
+# 機密與環境檔案
+.env
+.env.*
+*-adminsdk-*.json
+opencode-sk-*.json
+*.key
+
+# 工具產物
+node_modules/
+.firebase/
+firebase-debug.log
+*.log
+
+# 系統檔案
+.DS_Store
+Thumbs.db
