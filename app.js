@@ -230,12 +230,13 @@ function renderGrid(tk) {
       const st = getStatus(tk, r.roomNumber);
       const done = st === STATUS.COMPLETED;
       const isAdd = isAddon(r);
+      const isNoAdd = r.vegan === '不加購';
       return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}">
         <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${isAdd ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : ''}</td>
         <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
         <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
         <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}</td>
-        <td style="font-size:12px">${escapeHtml(r.vegan || '')}</td>
+        <td style="font-size:12px">${escapeHtml(r.vegan || '')}${isNoAdd ? `<button data-addon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
         <td style="text-align:center;font-weight:700">${escapeHtml(r.adult || '')}</td>
         <td style="text-align:center">${escapeHtml(r.child || '')}</td>
         <td style="font-size:12px">${escapeHtml(r.mealTime || '')}</td>
@@ -260,23 +261,23 @@ function renderGrid(tk) {
           </div>
         </div>
       </div>`;
-    // 點排切換已用餐 / 不加購可改
-    grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', () => {
-      const room = state.rooms.find(x => x.roomNumber === tr.dataset.room);
-      if (!room) return;
-      // 不加購 → 先改加購
-      if (room.vegan === '不加購') {
-        mealEditTarget = room.roomNumber;
-        $('mealEditTitle').textContent = `房號 ${room.roomNumber} 改為加購`;
-        $('mealEditHint').textContent = `來源：${room.source || ''}　此房原為不加購，改為加購後請輸入大人小孩數量`;
-        $('mealAdultInput').value = room.adult || '';
-        $('mealChildInput').value = room.child || '';
-        openModal('mealEditModal');
-        return;
-      }
+    // 點排切換已用餐；不加購用「改」按鈕另改
+    grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
+      if (e.target.closest('[data-addon]')) return; // 改按鈕不觸發切換
       const next = toggleStatus(tk, tr.dataset.room);
       if (navigator.vibrate) navigator.vibrate(next === STATUS.COMPLETED ? 20 : 8);
       toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
+    }));
+    grid.querySelectorAll('[data-addon]').forEach(btn => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const room = state.rooms.find(x => x.roomNumber === btn.dataset.addon);
+      if (!room) return;
+      mealEditTarget = room.roomNumber;
+      $('mealEditTitle').textContent = `房號 ${room.roomNumber} 改為加購`;
+      $('mealEditHint').textContent = `來源：${room.source || ''}　此房原為不加購，改為加購後請輸入大人小孩數量`;
+      $('mealAdultInput').value = room.adult || '';
+      $('mealChildInput').value = room.child || '';
+      openModal('mealEditModal');
     }));
     return;
   }
