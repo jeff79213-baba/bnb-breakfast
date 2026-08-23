@@ -212,6 +212,7 @@ function render() {
 
 function isBreakfast8Mode() { return state.rooms.length && state.rooms[0] && 'adult' in state.rooms[0]; }
 let mealEditTarget = null;
+let mealEditMode = 'addon'; // addon | revert
 function isAddon(r) { return r.eggMilk === '加購'; }
 function isHotMeal(r) { return !isAddon(r) && !!(r.adult || r.child) && r.vegan !== '不加購'; }
 function isNormalMeal(r) { return r.vegan === '不加購'; }
@@ -273,10 +274,12 @@ function renderGrid(tk) {
       const room = state.rooms.find(x => x.roomNumber === btn.dataset.addon);
       if (!room) return;
       mealEditTarget = room.roomNumber;
+      mealEditMode = 'addon';
       $('mealEditTitle').textContent = `房號 ${room.roomNumber} 改為加購`;
       $('mealEditHint').textContent = `來源：${room.source || ''}　此房原為不加購，改為加購後請輸入大人小孩數量`;
       $('mealAdultInput').value = room.adult || '';
       $('mealChildInput').value = room.child || '';
+      $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false;
       $('mealSaveBtn').textContent = '確認改為加購';
       openModal('mealEditModal');
     }));
@@ -284,13 +287,15 @@ function renderGrid(tk) {
       e.stopPropagation();
       const room = state.rooms.find(x => x.roomNumber === btn.dataset.revert);
       if (!room) return;
-      if (!confirm(`房號 ${room.roomNumber} 要改回不加購嗎？`)) return;
-      room.eggMilk = '';
-      room.vegan = '不加購';
-      room.adult = '';
-      room.child = '';
-      saveState(); render();
-      toast(`↩️ ${room.roomNumber} 已改回不加購`);
+      mealEditTarget = room.roomNumber;
+      mealEditMode = 'revert';
+      $('mealEditTitle').textContent = `房號 ${room.roomNumber} 改回不加購`;
+      $('mealEditHint').textContent = `來源：${room.source || ''}　此房目前為加購 ${room.adult || 0}/${room.child || 0}，確認改回不加購？`;
+      $('mealAdultInput').value = room.adult || '';
+      $('mealChildInput').value = room.child || '';
+      $('mealAdultInput').disabled = true; $('mealChildInput').disabled = true;
+      $('mealSaveBtn').textContent = '確認改回不加購';
+      openModal('mealEditModal');
     }));
     return;
   }
@@ -768,11 +773,22 @@ function bindEvents() {
     toast(`已刪除房號 ${roomModalTarget}`);
   });
 
-  // 不加購改加購
-  $('mealCancelBtn').addEventListener('click', () => { mealEditTarget = null; closeModal('mealEditModal'); });
+  // 不加購改加購 / 加購改回（同欄位位置）
+  $('mealCancelBtn').addEventListener('click', () => { mealEditTarget = null; $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false; closeModal('mealEditModal'); });
   $('mealSaveBtn').addEventListener('click', () => {
     const room = state.rooms.find(r => r.roomNumber === mealEditTarget);
     if (!room) return;
+    if (mealEditMode === 'revert') {
+      room.eggMilk = '';
+      room.vegan = '不加購';
+      room.adult = '';
+      room.child = '';
+      saveState();
+      $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false;
+      closeModal('mealEditModal'); mealEditTarget = null; render();
+      toast(`↩️ ${room.roomNumber} 已改回不加購`);
+      return;
+    }
     const a = $('mealAdultInput').value.trim();
     const c = $('mealChildInput').value.trim();
     if (a === '' && c === '') { toast('請輸入大人或小孩數量'); return; }
