@@ -67,7 +67,11 @@ function sanitizeRooms(rooms) {
     const no = normalizeRoomNo(r?.roomNumber ?? r?.roomNumber);
     if (!no || seen.has(no)) continue;
     seen.add(no);
-    out.push({ roomNumber: no, breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
+    if ('adult' in r) {
+      out.push({ roomNumber: no, source: r.source || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '', child: r.child || '', mealTime: r.mealTime || '', breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
+    } else {
+      out.push({ roomNumber: no, breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
+    }
   }
   return sortRooms(out);
 }
@@ -189,9 +193,40 @@ function render() {
   renderGrid(tk);
 }
 
+function isBreakfast8Mode() { return state.rooms.length && state.rooms[0] && 'adult' in state.rooms[0]; }
 function renderGrid(tk) {
   const grid = $('roomGrid');
   const rooms = filterRooms(tk, currentFilter);
+  // 8欄表格模式
+  if (isBreakfast8Mode()) {
+    const rows = rooms.map(r => {
+      const st = getStatus(tk, r.roomNumber);
+      const done = st === STATUS.COMPLETED;
+      const adult = r.adult || '', child = r.child || '';
+      const hasMeal = !!(adult || child);
+      const meal = hasMeal ? `${adult}/${child}` : (r.vegan === '不加購' ? '不加購' : '-');
+      const statusBadge = r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:2px 6px;border-radius:999px;font-size:12px">${escapeHtml(r.status)}</span>` : '';
+      return `<tr class="${done ? 'row-done' : ''}" data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer">
+        <td><b>${escapeHtml(r.roomNumber)}</b></td>
+        <td>${escapeHtml(r.source || '')}</td>
+        <td>${statusBadge}</td>
+        <td>${escapeHtml(r.eggMilk || '')}</td>
+        <td>${escapeHtml(r.vegan || '')}</td>
+        <td style="text-align:center">${escapeHtml(adult)}</td>
+        <td style="text-align:center">${escapeHtml(child)}</td>
+        <td>${escapeHtml(r.mealTime || '')}</td>
+        <td>${done ? '✅' : '⏳'}</td>
+      </tr>`;
+    }).join('');
+    grid.innerHTML = `<div style="overflow:auto;background:var(--card);border-radius:16px;box-shadow:0 2px 5px rgba(0,0,0,.07)"><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:#f1f3f5"><th style="padding:10px 6px">房號</th><th>來源</th><th>狀態</th><th>蛋奶素</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan=9 style="text-align:center;padding:24px;color:#868e96">無資料</td></tr>'}</tbody></table></div>`;
+    // 點列切換用餐
+    grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', () => {
+      const next = toggleStatus(tk, tr.dataset.room);
+      toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
+    }));
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.filter === currentFilter));
+    return;
+  }
   const html = rooms.map(r => {
     const st = getStatus(tk, r.roomNumber);
     const done = st === STATUS.COMPLETED;
@@ -367,7 +402,60 @@ function parseImport(text) {
   return { rows, issues, delim, hasHeader };
 }
 
-// ===== Excel 解析（新增：支援 .xlsx / .xls 二進位）=====
+// ===== 早餐統計 8欄專用解析（102~512可視+規則）=====
+function parseBreakfastMatrix(matrix, sheetMeta) {
+  // sheetMeta: { hiddenRows:Set }
+  if (!matrix || !matrix.length) return null;
+  const norm = matrix.map(row => (Array.isArray(row) ? row : [row]).map(c => String(c ?? '').trim()));
+  // 找標題列含 房號
+  let hr = -1;
+  for (let i = 0; i < Math.min(5, norm.length); i++) {
+    if (norm[i].some(c => c.includes('房號'))) { hr = i; break; }
+  }
+  if (hr === -1) return null;
+  // 判斷是否為 8欄版（有 來源/蛋奶素/全素/大人/小孩/用餐時間）
+  const header = norm[hr];
+  const has8 = header.some(c => /來源|訂單來源/.test(c)) && header.some(c => /大人/.test(c));
+  if (!has8) return null;
+
+  const hiddenRows = sheetMeta?.hiddenRows || new Set();
+  const rows = [];
+  const issues = [];
+  for (let i = hr + 1; i < norm.length; i++) {
+    const excelRowNum = i + 1; // 1-indexed
+    if (hiddenRows.has(excelRowNum)) continue;
+    const r = norm[i];
+    // 物理欄 B~H 對應 matrix 1~7 (A=0)
+    const roomRaw = (r[1] || '').trim();
+    if (!/^\d+$/.test(roomRaw)) continue;
+    const rn = parseInt(roomRaw, 10);
+    if (!(102 <= rn && rn <= 512)) continue;
+    const src = (r[2] || '').trim();
+    let pD = (r[3] || '').trim(), pE = (r[4] || '').trim(), pF = (r[5] || '').trim(), pG = (r[6] || '').trim(), pH = (r[7] || '').trim();
+    let 住宿狀態 = '', 蛋奶素 = '', 全素 = '', 大人 = '', 小孩 = '', 用餐時間 = pH;
+    const is_bu = (pE === '不' && pF === '加' && pG === '購');
+    const is_xu = (pD === '續住' && is_bu);
+    if (is_xu) { 住宿狀態 = '續住'; 全素 = '不加購'; }
+    else if (is_bu) {
+      if (pD === '續住') 住宿狀態 = '續住';
+      else if (pD) 蛋奶素 = pD;
+      全素 = '不加購';
+    } else {
+      if (pD === '續住') { 住宿狀態 = '續住'; 全素 = pE; 大人 = pF; 小孩 = pG; }
+      else if (pD === '加購') { 蛋奶素 = '加購'; 全素 = pE; 大人 = pF; 小孩 = pG; }
+      else { 蛋奶素 = pD; 全素 = pE; 大人 = pF; 小孩 = pG; }
+    }
+    // 轉為舊 rooms 格式 + 擴充欄位
+    const breakfastType = (大人 || 小孩) ? 'normal' : (全素 === '不加購' ? 'normal' : 'normal');
+    // 用成人>0 判斷是否需要熱食？此處統一 normal，後續依大人/小孩顯示
+    rows.push({ roomNumber: roomRaw, source: src, status: 住宿狀態, eggMilk: 蛋奶素, vegan: 全素, adult: 大人, child: 小孩, mealTime: 用餐時間, breakfastType, raw: r });
+  }
+  // 依房號排序
+  rows.sort((a, b) => parseInt(a.roomNumber) - parseInt(b.roomNumber));
+  return { rows, issues, isBreakfast8: true };
+}
+
+// ===== Excel 解析（支援 .xlsx / .xls 二進位）=====
 function isExcelFile(file) {
   return /\.xlsx?$/i.test(file.name || '');
 }
@@ -407,31 +495,50 @@ function parseFromMatrix(matrix) {
 }
 
 async function parseExcelFile(file) {
-  if (typeof XLSX === 'undefined') {
-    throw new Error('XLSX 未載入：請確認網路連線後重新整理');
-  }
+  if (typeof XLSX === 'undefined') throw new Error('XLSX 未載入：請確認網路連線後重新整理');
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: false });
   if (!wb.SheetNames.length) throw new Error('Excel 無工作表');
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  // header:1 取得二維陣列，defval 確保空白儲存格不被跳過
-  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false, blankrows: false });
+  // 優先找 早餐統計
+  let targetName = wb.SheetNames.find(n => n.includes('早餐')) || wb.SheetNames[0];
+  let sheet = wb.Sheets[targetName];
+  let hiddenRows = new Set();
+  if (sheet['!rows']) {
+    sheet['!rows'].forEach((r, idx) => { if (r && r.hidden) hiddenRows.add(idx + 1); });
+  }
+  let matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false, blankrows: false });
+  let parsed8 = parseBreakfastMatrix(matrix, { hiddenRows });
+  if (parsed8 && parsed8.rows.length) return parsed8;
+  // 若非 8欄，嘗試遍歷其他 sheet
+  for (const name of wb.SheetNames) {
+    if (name === targetName) continue;
+    const s = wb.Sheets[name];
+    const hr = new Set();
+    if (s['!rows']) s['!rows'].forEach((r, idx) => { if (r && r.hidden) hr.add(idx + 1); });
+    const m = XLSX.utils.sheet_to_json(s, { header: 1, defval: '', raw: false, blankrows: false });
+    const p = parseBreakfastMatrix(m, { hiddenRows: hr });
+    if (p && p.rows.length) return p;
+  }
+  // 退回舊通用解析
   return parseFromMatrix(matrix);
 }
 
 function showImportPreview(parsed) {
   importDraft = parsed;
-  const hotCount = parsed.rows.filter(r => r.breakfastType === 'hot').length;
-  $('importSummary').innerHTML =
-    `共判讀到 <b>${parsed.rows.length}</b> 筆房號<br>` +
-    `🔥 熱食 ${hotCount} 間　🥐 一般 ${parsed.rows.length - hotCount} 間`;
-  $('importIssues').innerHTML = parsed.issues.slice(0, 8)
-    .map(i => `<div class="issue">${escapeHtml(i)}</div>`).join('')
-    + (parsed.issues.length > 8 ? `<div class="issue">…另有 ${parsed.issues.length - 8} 項提示</div>` : '');
-  $('importPreviewList').innerHTML = parsed.rows.slice(0, 30).map(r => {
-    const info = typeInfo(r.breakfastType);
-    return `<div class="pv-row"><b>${escapeHtml(r.roomNumber)}</b><span>${info.emoji} ${info.label}</span></div>`;
-  }).join('') + (parsed.rows.length > 30 ? `<div class="pv-row hint">…其餘 ${parsed.rows.length - 30} 筆</div>` : '');
+  if (parsed.isBreakfast8) {
+    // 8欄預覽
+    $('importSummary').innerHTML = `共判讀到 <b>${parsed.rows.length}</b> 間（102~512可視）<br>已套用規則：不|加|購→不加購、續住→住宿狀態`;
+    $('importIssues').innerHTML = parsed.issues.slice(0, 8).map(i => `<div class="issue">${escapeHtml(i)}</div>`).join('') + (parsed.issues.length > 8 ? `<div class="issue">…另有 ${parsed.issues.length - 8} 項</div>` : '');
+    $('importPreviewList').innerHTML = `<div style="overflow:auto"><table style="width:100%;font-size:13px;border-collapse:collapse"><tr><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶素</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th></tr>` + parsed.rows.slice(0, 40).map(r => `<tr><td>${escapeHtml(r.roomNumber)}</td><td>${escapeHtml(r.source)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.eggMilk)}</td><td>${escapeHtml(r.vegan)}</td><td>${escapeHtml(r.adult)}</td><td>${escapeHtml(r.child)}</td><td>${escapeHtml(r.mealTime)}</td></tr>`).join('') + `</table>` + (parsed.rows.length > 40 ? `<div class="hint" style="text-align:center;padding:6px">…其餘 ${parsed.rows.length - 40} 筆</div>` : '') + `</div>`;
+  } else {
+    const hotCount = parsed.rows.filter(r => r.breakfastType === 'hot').length;
+    $('importSummary').innerHTML = `共判讀到 <b>${parsed.rows.length}</b> 筆房號<br>` + `🔥 熱食 ${hotCount} 間　🥐 一般 ${parsed.rows.length - hotCount} 間`;
+    $('importIssues').innerHTML = parsed.issues.slice(0, 8).map(i => `<div class="issue">${escapeHtml(i)}</div>`).join('') + (parsed.issues.length > 8 ? `<div class="issue">…另有 ${parsed.issues.length - 8} 項提示</div>` : '');
+    $('importPreviewList').innerHTML = parsed.rows.slice(0, 30).map(r => {
+      const info = typeInfo(r.breakfastType);
+      return `<div class="pv-row"><b>${escapeHtml(r.roomNumber)}</b><span>${info.emoji} ${info.label}</span></div>`;
+    }).join('') + (parsed.rows.length > 30 ? `<div class="pv-row hint">…其餘 ${parsed.rows.length - 30} 筆</div>` : '');
+  }
   closeModal('menuModal');
   openModal('importModal');
 }
@@ -464,7 +571,14 @@ function handleFile(file) {
 
 function confirmImport() {
   if (!importDraft) return;
-  state.rooms = sortRooms(importDraft.rows.map(r => ({ roomNumber: r.roomNumber, breakfastType: r.breakfastType })));
+  if (importDraft.isBreakfast8) {
+    // 8欄存法：保留完整欄位
+    state.rooms = sortRooms(importDraft.rows.map(r => ({
+      roomNumber: r.roomNumber, source: r.source, status: r.status, eggMilk: r.eggMilk, vegan: r.vegan, adult: r.adult, child: r.child, mealTime: r.mealTime, breakfastType: (r.adult || r.child) ? 'hot' : 'normal'
+    })));
+  } else {
+    state.rooms = sortRooms(importDraft.rows.map(r => ({ roomNumber: r.roomNumber, breakfastType: r.breakfastType })));
+  }
   saveState();
   render();
   closeModal('importModal');
