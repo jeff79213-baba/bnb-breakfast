@@ -151,6 +151,11 @@
       <label>大人 <input type="number" id="mealAdultInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
       <label>小孩 <input type="number" id="mealChildInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
     </div>
+    <label class="field-label">付款狀態</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button type="button" id="payPaidBtn" class="btn" style="min-height:56px">已付</button>
+      <button type="button" id="payUnpaidBtn" class="btn" style="min-height:56px">待付</button>
+    </div>
     <div class="row-actions">
       <button class="btn" id="mealCancelBtn">取消</button>
       <button class="btn primary" id="mealSaveBtn">確認改為加購</button>

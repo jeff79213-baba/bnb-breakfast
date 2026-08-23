@@ -68,7 +68,7 @@ function sanitizeRooms(rooms) {
     if (!no || seen.has(no)) continue;
     seen.add(no);
     if ('adult' in r) {
-      out.push({ roomNumber: no, source: r.source || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '', child: r.child || '', mealTime: r.mealTime || '', breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
+      out.push({ roomNumber: no, source: r.source || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '', child: r.child || '', mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
     } else {
       out.push({ roomNumber: no, breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
     }
@@ -213,6 +213,17 @@ function render() {
 function isBreakfast8Mode() { return state.rooms.length && state.rooms[0] && 'adult' in state.rooms[0]; }
 let mealEditTarget = null;
 let mealEditMode = 'addon'; // addon | revert
+let mealPayChoice = '待付'; // 已付 | 待付
+function updatePayButtons() {
+  const paid = $('payPaidBtn'), unpaid = $('payUnpaidBtn');
+  if (mealPayChoice === '已付') {
+    paid.style.background = '#2f9e44'; paid.style.borderColor = '#2f9e44'; paid.style.color = '#fff';
+    unpaid.style.background = '#fff'; unpaid.style.borderColor = '#dee2e6'; unpaid.style.color = '#212529';
+  } else {
+    unpaid.style.background = '#e8590c'; unpaid.style.borderColor = '#e8590c'; unpaid.style.color = '#fff';
+    paid.style.background = '#fff'; paid.style.borderColor = '#dee2e6'; paid.style.color = '#212529';
+  }
+}
 function isAddon(r) { return r.eggMilk === '加購'; }
 function isHotMeal(r) { return !isAddon(r) && !!(r.adult || r.child) && r.vegan !== '不加購'; }
 function isNormalMeal(r) { return r.vegan === '不加購'; }
@@ -232,8 +243,11 @@ function renderGrid(tk) {
       const done = st === STATUS.COMPLETED;
       const isAdd = isAddon(r);
       const isNoAdd = r.vegan === '不加購';
+      // 匯入即加購（無付款狀態）→ 黃底「加購」；現場改加購 → 房號下方顯示 已付/待付
+      const yellowBadge = (isAdd && !r.payStatus) ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : '';
+      const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
       return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}">
-        <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${isAdd ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : ''}</td>
+        <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
         <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
         <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
         <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}${isAdd ? `<button data-revert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
@@ -280,6 +294,8 @@ function renderGrid(tk) {
       $('mealAdultInput').value = room.adult || '';
       $('mealChildInput').value = room.child || '';
       $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false;
+      mealPayChoice = '待付';
+      updatePayButtons();
       $('mealSaveBtn').textContent = '確認改為加購';
       openModal('mealEditModal');
     }));
@@ -290,7 +306,7 @@ function renderGrid(tk) {
       mealEditTarget = room.roomNumber;
       mealEditMode = 'revert';
       $('mealEditTitle').textContent = `房號 ${room.roomNumber} 改回不加購`;
-      $('mealEditHint').textContent = `來源：${room.source || ''}　此房目前為加購 ${room.adult || 0}/${room.child || 0}，確認改回不加購？`;
+      $('mealEditHint').textContent = `來源：${room.source || ''}　此房目前為加購 ${room.adult || 0}/${room.child || 0}${room.payStatus ? `（${room.payStatus}）` : ''}，確認改回不加購？`;
       $('mealAdultInput').value = room.adult || '';
       $('mealChildInput').value = room.child || '';
       $('mealAdultInput').disabled = true; $('mealChildInput').disabled = true;
@@ -649,7 +665,7 @@ function confirmImport() {
   if (importDraft.isBreakfast8) {
     // 8欄存法：保留完整欄位
     state.rooms = sortRooms(importDraft.rows.map(r => ({
-      roomNumber: r.roomNumber, source: r.source, status: r.status, eggMilk: r.eggMilk, vegan: r.vegan, adult: r.adult, child: r.child, mealTime: r.mealTime, breakfastType: (r.adult || r.child) ? 'hot' : 'normal'
+      roomNumber: r.roomNumber, source: r.source, status: r.status, eggMilk: r.eggMilk, vegan: r.vegan, adult: r.adult, child: r.child, mealTime: r.mealTime, payStatus: '', breakfastType: (r.adult || r.child) ? 'hot' : 'normal'
     })));
   } else {
     state.rooms = sortRooms(importDraft.rows.map(r => ({ roomNumber: r.roomNumber, breakfastType: r.breakfastType })));
@@ -774,6 +790,8 @@ function bindEvents() {
   });
 
   // 不加購改加購 / 加購改回（同欄位位置）
+  $('payPaidBtn').addEventListener('click', () => { mealPayChoice = '已付'; updatePayButtons(); });
+  $('payUnpaidBtn').addEventListener('click', () => { mealPayChoice = '待付'; updatePayButtons(); });
   $('mealCancelBtn').addEventListener('click', () => { mealEditTarget = null; $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false; closeModal('mealEditModal'); });
   $('mealSaveBtn').addEventListener('click', () => {
     const room = state.rooms.find(r => r.roomNumber === mealEditTarget);
@@ -783,6 +801,7 @@ function bindEvents() {
       room.vegan = '不加購';
       room.adult = '';
       room.child = '';
+      room.payStatus = '';
       saveState();
       $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false;
       closeModal('mealEditModal'); mealEditTarget = null; render();
@@ -796,11 +815,12 @@ function bindEvents() {
     room.vegan = '';
     room.adult = a;
     room.child = c;
+    room.payStatus = mealPayChoice;
     saveState();
     closeModal('mealEditModal');
     mealEditTarget = null;
     render();
-    toast(`✅ ${room.roomNumber} 已改為加購 ${a}/${c}`);
+    toast(`✅ ${room.roomNumber} 已改為加購 ${a}/${c}（${mealPayChoice}）`);
   });
 }
 
