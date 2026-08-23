@@ -219,6 +219,9 @@ function renderGrid(tk) {
   const grid = $('roomGrid');
   // 8欄兩欄模式：熟食｜一般 每房一橫排
   if (isBreakfast8Mode()) {
+    // 讓兩欄寬度與橘棒一致：取消 grid 原有卡片佈局
+    grid.style.display = 'block';
+    grid.style.gridTemplateColumns = 'none';
     const all = sortRooms(state.rooms);
     const hotList = all.filter(r => isHotMeal(r) || isAddon(r));
     const normalList = all.filter(isNormalMeal);
@@ -243,7 +246,7 @@ function renderGrid(tk) {
     const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無一般</td></tr>';
     // 上方四按鈕同時顯示，不做單欄篩選 - 僅顯示數字
     grid.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:100%">
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
           <div style="overflow:auto;max-height:62vh">
@@ -277,6 +280,9 @@ function renderGrid(tk) {
     }));
     return;
   }
+  // 切回卡片模式時恢復 grid 樣式
+  grid.style.display = '';
+  grid.style.gridTemplateColumns = '';
   const html = rooms.map(r => {
     const st = getStatus(tk, r.roomNumber);
     const done = st === STATUS.COMPLETED;
