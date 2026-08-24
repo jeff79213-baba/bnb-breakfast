@@ -227,35 +227,32 @@ function updatePayButtons() {
 function isAddon(r) { return r.eggMilk === '加購'; }
 function isHotMeal(r) { return !isAddon(r) && !!(r.adult || r.child) && r.vegan !== '不加購'; }
 function isNormalMeal(r) { return r.vegan === '不加購'; }
-// 兩欄定向滑動：首次滑動方向決定鎖定上下或左右，避免斜向亂飄（無抖動版）
-// 原理：12px 內不判斷，超過後依主軸切 touch-action，靠瀏覽器原生鎖軸，不強制改 scroll 避免抖動
+// 兩欄定向滑動：真正單軸鎖定，避免斜滑（手動接管 touch）
+// touch-action:none + preventDefault，手動依主軸只捲單向
 function attachDirectionLock(el) {
   let sx = 0, sy = 0, locked = null;
+  let startTop = 0, startLeft = 0;
   el.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    startTop = el.scrollTop; startLeft = el.scrollLeft;
     locked = null;
-    el.classList.remove('drag-lock-v', 'drag-lock-h');
   }, { passive: true });
   el.addEventListener('touchmove', e => {
     if (e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - sx;
-    const dy = e.touches[0].clientY - sy;
+    const cx = e.touches[0].clientX, cy = e.touches[0].clientY;
+    const dx = cx - sx, dy = cy - sy;
     if (!locked) {
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
       locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
-      el.classList.toggle('drag-lock-h', locked === 'h');
-      el.classList.toggle('drag-lock-v', locked === 'v');
     }
-  }, { passive: true });
-  el.addEventListener('touchend', () => {
-    locked = null;
-    el.classList.remove('drag-lock-v', 'drag-lock-h');
-  }, { passive: true });
-  el.addEventListener('touchcancel', () => {
-    locked = null;
-    el.classList.remove('drag-lock-v', 'drag-lock-h');
-  }, { passive: true });
+    // 鎖定後只允許單軸，另一軸完全不動；用 preventDefault 擋掉瀏覽器原生斜滑
+    e.preventDefault();
+    if (locked === 'v') el.scrollTop = startTop - dy;
+    else if (locked === 'h') el.scrollLeft = startLeft - dx;
+  }, { passive: false });
+  el.addEventListener('touchend', () => { locked = null; }, { passive: true });
+  el.addEventListener('touchcancel', () => { locked = null; }, { passive: true });
 }
 function renderGrid(tk) {
   const grid = $('roomGrid');

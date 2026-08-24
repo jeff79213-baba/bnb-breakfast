@@ -332,11 +332,9 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
   min-height: 160px;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
+  touch-action: none;
   scrollbar-width: thin;
 }
-.pane-scroll.drag-lock-v { touch-action: pan-y; }
-.pane-scroll.drag-lock-h { touch-action: pan-x; }
 /* 表頭固定：上下滑動時 房號/來源/狀態 等不跟著捲 */
 .pane-scroll thead th {
   position: sticky;
