@@ -227,6 +227,35 @@ function updatePayButtons() {
 function isAddon(r) { return r.eggMilk === '加購'; }
 function isHotMeal(r) { return !isAddon(r) && !!(r.adult || r.child) && r.vegan !== '不加購'; }
 function isNormalMeal(r) { return r.vegan === '不加購'; }
+// 兩欄定向滑動：首次滑動方向決定鎖定上下或左右，避免斜向亂飄
+function attachDirectionLock(el) {
+  let sx = 0, sy = 0, locked = null;
+  el.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    locked = null;
+    el.classList.remove('drag-lock-v', 'drag-lock-h');
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - sx;
+    const dy = e.touches[0].clientY - sy;
+    if (!locked) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      el.classList.toggle('drag-lock-h', locked === 'h');
+      el.classList.toggle('drag-lock-v', locked === 'v');
+    }
+  }, { passive: true });
+  el.addEventListener('touchend', () => {
+    locked = null;
+    el.classList.remove('drag-lock-v', 'drag-lock-h');
+  }, { passive: true });
+  el.addEventListener('touchcancel', () => {
+    locked = null;
+    el.classList.remove('drag-lock-v', 'drag-lock-h');
+  }, { passive: true });
+}
 function renderGrid(tk) {
   const grid = $('roomGrid');
   // 8欄兩欄模式：熟食｜一般 每房一橫排
@@ -265,17 +294,18 @@ function renderGrid(tk) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:100%">
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
-          <div style="overflow:auto;max-height:62vh">
+          <div class="pane-scroll" data-pane="hot">
             <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
           </div>
         </div>
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">一般</div>
-          <div style="overflow:auto;max-height:62vh">
+          <div class="pane-scroll" data-pane="normal">
             <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
           </div>
         </div>
       </div>`;
+    grid.querySelectorAll('.pane-scroll').forEach(attachDirectionLock);
     // 點排切換已用餐；不加購用「改」按鈕另改
     grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
       if (e.target.closest('[data-addon]')) return; // 改按鈕不觸發切換
