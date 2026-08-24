@@ -288,6 +288,9 @@ function renderGrid(tk) {
     const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
     const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無一般</td></tr>';
     // 上方四按鈕同時顯示，不做單欄篩選 - 僅顯示數字
+    // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
+    const savedScrolls = {};
+    grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
     grid.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:100%">
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
@@ -303,6 +306,10 @@ function renderGrid(tk) {
           </div>
         </div>
       </div>`;
+    grid.querySelectorAll('.pane-scroll').forEach(el => {
+      const saved = savedScrolls[el.dataset.pane];
+      if (typeof saved === 'number') el.scrollTop = saved;
+    });
     grid.querySelectorAll('.pane-scroll').forEach(attachDirectionLock);
     // 點排切換已用餐；不加購用「改」按鈕另改
     grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
