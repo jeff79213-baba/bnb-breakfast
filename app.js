@@ -227,16 +227,14 @@ function updatePayButtons() {
 function isAddon(r) { return r.eggMilk === '加購'; }
 function isHotMeal(r) { return !isAddon(r) && !!(r.adult || r.child) && r.vegan !== '不加購'; }
 function isNormalMeal(r) { return r.vegan === '不加購'; }
-// 兩欄定向滑動：首次滑動方向決定鎖定上下或左右，避免斜向亂飄
-// 手機：touch 依起始 12px 判斷主軸，鎖定後強制另一軸 scroll 不動；電腦：wheel 亦做同樣定向
+// 兩欄定向滑動：首次滑動方向決定鎖定上下或左右，避免斜向亂飄（無抖動版）
+// 原理：12px 內不判斷，超過後依主軸切 touch-action，靠瀏覽器原生鎖軸，不強制改 scroll 避免抖動
 function attachDirectionLock(el) {
   let sx = 0, sy = 0, locked = null;
-  let startLeft = 0, startTop = 0;
   el.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
     locked = null;
-    startLeft = el.scrollLeft; startTop = el.scrollTop;
     el.classList.remove('drag-lock-v', 'drag-lock-h');
   }, { passive: true });
   el.addEventListener('touchmove', e => {
@@ -249,9 +247,6 @@ function attachDirectionLock(el) {
       el.classList.toggle('drag-lock-h', locked === 'h');
       el.classList.toggle('drag-lock-v', locked === 'v');
     }
-    // 鎖定後強制另一軸維持在起點，達成只有上下或只有左右
-    if (locked === 'v' && el.scrollLeft !== startLeft) el.scrollLeft = startLeft;
-    if (locked === 'h' && el.scrollTop !== startTop) el.scrollTop = startTop;
   }, { passive: true });
   el.addEventListener('touchend', () => {
     locked = null;
@@ -261,14 +256,6 @@ function attachDirectionLock(el) {
     locked = null;
     el.classList.remove('drag-lock-v', 'drag-lock-h');
   }, { passive: true });
-  // 電腦滾輪/觸控板：若同時有 X/Y 偏移，只保留主方向
-  el.addEventListener('wheel', e => {
-    const absX = Math.abs(e.deltaX), absY = Math.abs(e.deltaY);
-    if (absX > 2 && absY > 2) {
-      if (absX > absY) e.preventDefault(), el.scrollLeft += e.deltaX;
-      else e.preventDefault(), el.scrollTop += e.deltaY;
-    }
-  }, { passive: false });
 }
 function renderGrid(tk) {
   const grid = $('roomGrid');
