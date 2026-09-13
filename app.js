@@ -165,7 +165,21 @@ function toggleStatus(dateKey, roomNumber) {
 function isOrderMode() { return state.rooms.length && state.rooms[0] && 'infant' in state.rooms[0]; }
 // 訂單來源分流：手動/官網＝熟食，其餘＝一般（不加購/加購手動狀態優先）
 function isHotSource(src) { return /手動|官網/.test(String(src || '')); }
-function orderIsAddon(r) { return r.eggMilk === '加購'; }
+function orderIsAddon(r) { return /加購/.test(r.eggMilk || ''); }
+const MEAL_TYPES = ['正常', '蛋奶', '全素']; // 加購種類三選一
+let mealTypeChoice = '正常'; // 正常 | 蛋奶 | 全素
+function updateMealTypeButtons() {
+  const map = { '正常': $('mealTypeNormalBtn'), '蛋奶': $('mealTypeEggBtn'), '全素': $('mealTypeVeganBtn') };
+  Object.entries(map).forEach(([k, btn]) => {
+    if (!btn) return;
+    if (mealTypeChoice === k) {
+      btn.style.background = '#7048e8'; btn.style.borderColor = '#7048e8'; btn.style.color = '#fff';
+    } else {
+      btn.style.background = '#fff'; btn.style.borderColor = '#dee2e6'; btn.style.color = '#212529';
+    }
+  });
+}
+function mealTypeValue() { return mealTypeChoice === '正常' ? '加購' : mealTypeChoice + '加購'; }
 function orderIsNoAdd(r) { return r.vegan === '不加購'; }
 function orderInHot(r) {
   if (orderIsNoAdd(r)) return false;
@@ -325,10 +339,10 @@ function renderOrderGrid(tk) {
     const isAdd = orderIsAddon(r);
     const isNoAdd = orderIsNoAdd(r);
     const kid = orderKid(r);
-    const yellowBadge = (isAdd && !r.payStatus) ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : '';
+    const yellowBadge = (isAdd && !r.payStatus) ? `<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">${escapeHtml(r.eggMilk)}</span>` : '';
     const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
     return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}">
-      <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}<div style="font-size:11px;font-weight:400;color:#868e96">${escapeHtml(r.roomType || '')}</div></td>
+      <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
       <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
       <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
       <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}${isAdd ? `<button data-orderrevert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
@@ -393,12 +407,13 @@ function openOrderEdit(roomNo) {
   orderEditTarget = roomNo;
   $('orderEditTitle').textContent = `房號 ${roomNo}`;
   $('orderEditSource').textContent = `來源：${room.source || ''}（不可更改）`;
+  $('orderRoomNoInput').value = roomNo;
   $('orderAdultInput').value = room.adult ?? '';
   $('orderChildInput').value = room.child ?? '';
   $('orderInfantInput').value = room.infant ?? '';
   $('orderTimeInput').value = room.mealTime || '';
   $('orderStatusInput').value = room.status || '';
-  $('orderEggMilkInput').value = room.eggMilk === '加購' ? '加購' : '';
+  $('orderEggMilkInput').value = ['加購', '蛋奶加購', '全素加購'].includes(room.eggMilk) ? room.eggMilk : '';
   $('orderVeganInput').value = room.vegan === '不加購' ? '不加購' : '';
   openModal('orderEditModal');
 }
@@ -482,6 +497,7 @@ function renderGrid(tk) {
       $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false;
       mealPayChoice = '待付';
       updatePayButtons();
+      if ($('mealTypeRow')) $('mealTypeRow').style.display = 'none';
       $('mealSaveBtn').textContent = '確認改為加購';
       openModal('mealEditModal');
     }));
@@ -1161,28 +1177,46 @@ function bindEvents() {
   });
   $('prepCloseBtn').addEventListener('click', () => closeModal('prepModal'));
 
-  // 新訂單房號編輯：房號與來源唯讀，其餘可改（含狀態/蛋奶/全素）
+  // 新訂單房號編輯：來源唯讀，房號與其餘可改（含狀態/蛋奶/全素）
   $('orderSaveBtn').addEventListener('click', () => {
     const room = state.rooms.find(r => r.roomNumber === orderEditTarget);
-    if (room) {
-      const num = (id) => {
-        const v = Number($(id).value);
-        return Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
-      };
-      room.adult = num('orderAdultInput');
-      room.child = num('orderChildInput');
-      room.infant = num('orderInfantInput');
-      room.mealTime = $('orderTimeInput').value.trim();
-      room.status = $('orderStatusInput').value.trim();
-      room.eggMilk = $('orderEggMilkInput').value === '加購' ? '加購' : '';
-      room.vegan = $('orderVeganInput').value === '不加購' ? '不加購' : '';
-      if (room.eggMilk === '加購' && room.vegan === '不加購') room.vegan = '';
-      saveState();
-      render();
+    if (!room) { orderEditTarget = null; closeModal('orderEditModal'); return; }
+    const num = (id) => {
+      const v = Number($(id).value);
+      return Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    };
+    // 房號可改（現場換房）：重複則擋下，今日用餐狀態跟著搬到新房號
+    const newNo = normalizeRoomNo($('orderRoomNoInput').value);
+    if (!newNo) { toast('房號不可為空'); return; }
+    if (newNo !== room.roomNumber && state.rooms.some(r => r.roomNumber === newNo)) {
+      toast(`❌ 房號 ${newNo} 已存在`);
+      return;
     }
+    if (newNo !== room.roomNumber) {
+      const tk = todayKey();
+      if (state.daily[tk] && state.daily[tk][room.roomNumber] !== undefined) {
+        state.daily[tk][newNo] = state.daily[tk][room.roomNumber];
+        delete state.daily[tk][room.roomNumber];
+      }
+      room.roomNumber = newNo;
+      state.rooms = sortRooms(state.rooms);
+    }
+    room.adult = num('orderAdultInput');
+    room.child = num('orderChildInput');
+    room.infant = num('orderInfantInput');
+    room.mealTime = $('orderTimeInput').value.trim();
+    room.status = $('orderStatusInput').value.trim();
+    const em = $('orderEggMilkInput').value;
+    room.eggMilk = ['加購', '蛋奶加購', '全素加購'].includes(em) ? em : '';
+    room.vegan = $('orderVeganInput').value === '不加購' ? '不加購' : '';
+    if (room.eggMilk && room.vegan === '不加購') room.vegan = '';
+    const moved = newNo !== orderEditTarget;
+    const oldNo = orderEditTarget;
+    saveState();
+    render();
     closeModal('orderEditModal');
     orderEditTarget = null;
-    toast('已更新');
+    toast(moved ? `已改房 ${oldNo} → ${newNo}` : '已更新');
   });
   $('orderCancelBtn').addEventListener('click', () => { orderEditTarget = null; closeModal('orderEditModal'); });
 
@@ -1240,6 +1274,9 @@ function bindEvents() {
   // 不加購改加購 / 加購改回（同欄位位置）
   $('payPaidBtn').addEventListener('click', () => { mealPayChoice = '已付'; updatePayButtons(); });
   $('payUnpaidBtn').addEventListener('click', () => { mealPayChoice = '待付'; updatePayButtons(); });
+  $('mealTypeNormalBtn').addEventListener('click', () => { mealTypeChoice = '正常'; updateMealTypeButtons(); });
+  $('mealTypeEggBtn').addEventListener('click', () => { mealTypeChoice = '蛋奶'; updateMealTypeButtons(); });
+  $('mealTypeVeganBtn').addEventListener('click', () => { mealTypeChoice = '全素'; updateMealTypeButtons(); });
   $('mealCancelBtn').addEventListener('click', () => { mealEditTarget = null; $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false; closeModal('mealEditModal'); });
   $('mealSaveBtn').addEventListener('click', () => {
     const room = state.rooms.find(r => r.roomNumber === mealEditTarget);
@@ -1259,7 +1296,7 @@ function bindEvents() {
     const a = $('mealAdultInput').value.trim();
     const c = $('mealChildInput').value.trim();
     if (a === '' && c === '') { toast('請輸入大人或小孩數量'); return; }
-    room.eggMilk = '加購';
+    room.eggMilk = isOrder ? mealTypeValue() : '加購';
     room.vegan = '';
     if (isOrder) {
       const na = Math.max(0, Math.floor(Number(a) || 0));
@@ -1274,7 +1311,7 @@ function bindEvents() {
     closeModal('mealEditModal');
     mealEditTarget = null;
     render();
-    toast(`✅ ${room.roomNumber} 已改為加購 ${a}/${c}（${mealPayChoice}）`);
+    toast(`✅ ${room.roomNumber} 已改為${room.eggMilk} ${a}/${c}（${mealPayChoice}）`);
   });
 }
 
@@ -1293,14 +1330,18 @@ function openMealEdit(roomNo, mode) {
     $('mealSaveBtn').textContent = '確認改回不加購';
   } else {
     $('mealEditTitle').textContent = `房號 ${room.roomNumber} 改為加購`;
-    $('mealEditHint').textContent = `來源：${room.source || ''}　此房原為不加購，改為加購後請輸入大人小孩數量`;
+    $('mealEditHint').textContent = `來源：${room.source || ''}　此房原為不加購，請選加購種類並輸入大人小孩數量`;
     $('mealAdultInput').value = room.adult ?? '';
     $('mealChildInput').value = room.child ?? '';
     $('mealAdultInput').disabled = false; $('mealChildInput').disabled = false;
     mealPayChoice = '待付';
     updatePayButtons();
+    mealTypeChoice = '正常';
+    updateMealTypeButtons();
+    $('mealTypeRow').style.display = '';
     $('mealSaveBtn').textContent = '確認改為加購';
   }
+  if (mode === 'revert' && $('mealTypeRow')) $('mealTypeRow').style.display = 'none';
   openModal('mealEditModal');
 }
 

@@ -157,6 +157,14 @@
       <button type="button" id="payPaidBtn" class="btn" style="min-height:56px">已付</button>
       <button type="button" id="payUnpaidBtn" class="btn" style="min-height:56px">待付</button>
     </div>
+    <div id="mealTypeRow">
+      <label class="field-label">加購種類</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <button type="button" id="mealTypeNormalBtn" class="btn" style="min-height:56px">正常</button>
+        <button type="button" id="mealTypeEggBtn" class="btn" style="min-height:56px">蛋奶</button>
+        <button type="button" id="mealTypeVeganBtn" class="btn" style="min-height:56px">全素</button>
+      </div>
+    </div>
     <div class="row-actions">
       <button class="btn" id="mealCancelBtn">取消</button>
       <button class="btn primary" id="mealSaveBtn">確認改為加購</button>
@@ -170,6 +178,8 @@
     <div class="sheet-handle"></div>
     <h2 id="orderEditTitle">修改房號</h2>
     <p class="hint" id="orderEditSource"></p>
+    <label class="field-label">房號（現場換房可改）</label>
+    <input type="text" id="orderRoomNoInput" inputmode="text" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:20px;font-weight:800">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
       <label>大人<input type="number" id="orderAdultInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
       <label>孩童<input type="number" id="orderChildInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
@@ -187,7 +197,9 @@
       <label>蛋奶
         <select id="orderEggMilkInput" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 10px;font-size:16px">
           <option value="">（空）</option>
-          <option value="加購">加購</option>
+          <option value="加購">加購（正常）</option>
+          <option value="蛋奶加購">蛋奶加購</option>
+          <option value="全素加購">全素加購</option>
         </select>
       </label>
       <label>全素
