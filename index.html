@@ -177,6 +177,26 @@
     </div>
     <label class="field-label">用餐時間</label>
     <input type="text" id="orderTimeInput" placeholder="例如 8:15" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
+      <label>狀態
+        <select id="orderStatusInput" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 10px;font-size:16px">
+          <option value="">（空）</option>
+          <option value="續住">續住</option>
+        </select>
+      </label>
+      <label>蛋奶
+        <select id="orderEggMilkInput" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 10px;font-size:16px">
+          <option value="">（空）</option>
+          <option value="加購">加購</option>
+        </select>
+      </label>
+      <label>全素
+        <select id="orderVeganInput" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 10px;font-size:16px">
+          <option value="">（空）</option>
+          <option value="不加購">不加購</option>
+        </select>
+      </label>
+    </div>
     <div class="row-actions">
       <button class="btn" id="orderCancelBtn">取消</button>
       <button class="btn primary" id="orderSaveBtn">儲存</button>
@@ -192,19 +212,25 @@
     <div id="prepSumLine" class="import-summary"></div>
     <div id="prepHotLine" class="hint" style="margin-top:4px"></div>
 
-    <h3 style="margin:16px 0 6px">果凍奶酪 <span class="hint">總人數×比例−庫存</span></h3>
+    <h3 style="margin:16px 0 6px">果凍奶酪 <span class="hint">總量＝總人數×比例；應做＝需要−庫存</span></h3>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
       <label class="hint">比例<input type="number" id="jellyRatio" step="0.05" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
-      <label class="hint">庫存<input type="number" id="jellyStock" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
-      <label class="hint">奶酪除數<input type="number" id="cheeseDiv" min="1" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">果凍庫存<input type="number" id="jellyStock" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">奶酪庫存<input type="number" id="cheeseStock" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
     </div>
-    <div class="import-summary" style="margin-top:6px">應做 <b id="jellyTotal">0</b>　奶酪 <b id="cheeseNum">0</b>　果凍 <b id="jellyNum">0</b></div>
+    <div style="margin-top:8px">
+      <label class="hint">奶酪除數（奶酪需要＝總量÷除數，單一品項）<input type="number" id="cheeseDiv" min="1" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+    </div>
+    <div class="import-summary" style="margin-top:6px">總量 <b id="jellyTotal">0</b>　奶酪應做 <b id="cheeseNum">0</b>　果凍應做 <b id="jellyNum">0</b></div>
+    <div class="hint" style="margin-top:10px">果凍品項分配（已分配 <b id="jellyAllocated">0</b>　剩餘 <b id="jellyRemain">0</b>）</div>
+    <div id="jellyItems" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"></div>
 
-    <h3 style="margin:16px 0 6px">茶葉蛋 <span class="hint">總人數×比例−庫存＋預留</span></h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    <h3 style="margin:16px 0 6px">茶葉蛋 <span class="hint">應煮＝總人數×比例−庫存＋預留顆＋比例×預留％</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <label class="hint">比例<input type="number" id="eggRatio" step="0.1" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
       <label class="hint">庫存<input type="number" id="eggStock" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
-      <label class="hint">預留多煮<input type="number" id="eggExtra" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">預留多煮（顆）<input type="number" id="eggExtra" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">預留多煮（％）<input type="number" id="eggReservePct" step="5" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
     </div>
     <div class="import-summary" style="margin-top:6px">應煮 <b id="eggTotal">0</b> 顆</div>
 
