@@ -90,6 +90,7 @@
     <h2>功能選單</h2>
     <button class="btn list-btn" id="menuManageBtn">🏠 管理房號</button>
     <button class="btn list-btn" id="menuImportBtn">📂 匯入資料（Excel / CSV）</button>
+    <button class="btn list-btn" id="menuPrepBtn">🧮 備料區</button>
     <button class="btn list-btn" id="menuExportBtn">📤 匯出今日紀錄</button>
     <button class="btn list-btn subtle" id="menuCloseBtn">關閉</button>
   </div>
@@ -160,6 +161,68 @@
       <button class="btn" id="mealCancelBtn">取消</button>
       <button class="btn primary" id="mealSaveBtn">確認改為加購</button>
     </div>
+  </div>
+</div>
+
+<!-- 新訂單房號編輯（房號與來源唯讀） -->
+<div class="modal-backdrop hidden" id="orderEditModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="orderEditTitle">修改房號</h2>
+    <p class="hint" id="orderEditSource"></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
+      <label>大人<input type="number" id="orderAdultInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
+      <label>孩童<input type="number" id="orderChildInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
+      <label>嬰幼兒<input type="number" id="orderInfantInput" inputmode="numeric" min="0" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px"></label>
+    </div>
+    <label class="field-label">用餐時間</label>
+    <input type="text" id="orderTimeInput" placeholder="例如 8:15" style="width:100%;min-height:52px;border:2px solid #dee2e6;border-radius:12px;padding:0 14px;font-size:18px">
+    <div class="row-actions">
+      <button class="btn" id="orderCancelBtn">取消</button>
+      <button class="btn primary" id="orderSaveBtn">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 備料區 -->
+<div class="modal-backdrop hidden" id="prepModal">
+  <div class="sheet tall">
+    <div class="sheet-handle"></div>
+    <h2>🧮 備料區</h2>
+    <div id="prepSumLine" class="import-summary"></div>
+    <div id="prepHotLine" class="hint" style="margin-top:4px"></div>
+
+    <h3 style="margin:16px 0 6px">果凍奶酪 <span class="hint">總人數×比例−庫存</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <label class="hint">比例<input type="number" id="jellyRatio" step="0.05" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">庫存<input type="number" id="jellyStock" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">奶酪除數<input type="number" id="cheeseDiv" min="1" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+    </div>
+    <div class="import-summary" style="margin-top:6px">應做 <b id="jellyTotal">0</b>　奶酪 <b id="cheeseNum">0</b>　果凍 <b id="jellyNum">0</b></div>
+
+    <h3 style="margin:16px 0 6px">茶葉蛋 <span class="hint">總人數×比例−庫存＋預留</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <label class="hint">比例<input type="number" id="eggRatio" step="0.1" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">庫存<input type="number" id="eggStock" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">預留多煮<input type="number" id="eggExtra" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+    </div>
+    <div class="import-summary" style="margin-top:6px">應煮 <b id="eggTotal">0</b> 顆</div>
+
+    <h3 style="margin:16px 0 6px">主食（新式）<span class="hint">大人×係數＋小孩×係數</span></h3>
+    <div class="hint" id="prepKidNote" style="margin-bottom:6px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <label class="hint">飯大人係數<input type="number" id="riceAdult" step="0.05" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">飯小孩係數<input type="number" id="riceChild" step="0.05" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">粥大人係數<input type="number" id="porridgeAdult" step="0.05" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+      <label class="hint">粥小孩係數<input type="number" id="porridgeChild" step="0.05" min="0" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+    </div>
+    <div class="import-summary" style="margin-top:6px">飯量 <b id="riceNum">0</b> 杯　粥量 <b id="porridgeNum">0</b> 杯</div>
+    <div style="margin-top:8px">
+      <label class="hint">特殊主食除數（大人＋小孩×0.5）÷除數<input type="number" id="specialDiv" min="1" style="width:100%;min-height:48px;border:2px solid #dee2e6;border-radius:10px;padding:0 10px;font-size:16px"></label>
+    </div>
+    <div class="import-summary" style="margin-top:6px">特殊主食 <b id="specialNum">0</b></div>
+
+    <button class="btn subtle full" id="prepCloseBtn" style="margin-top:16px">關閉</button>
   </div>
 </div>
 

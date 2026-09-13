@@ -22,10 +22,28 @@ let roomModalTarget = null;      // 編輯中的房號
 const $ = (id) => document.getElementById(id);
 
 // ===== 預設狀態 / 載入 / 儲存 =====
+// ===== 備料區預設比例（新式計算公式，均可在備料區更改）=====
+const DEFAULT_PREP = {
+  jellyRatio: 1.1,    // 果凍奶酪：總人數 × 比例 − 庫存
+  jellyStock: 0,      // 果凍奶酪剩餘庫存
+  cheeseDiv: 4,       // 奶酪 = 應做總量 / cheeseDiv
+  eggRatio: 1.5,      // 茶葉蛋：總人數 × 比例 − 庫存 + 預留多煮
+  eggStock: 0,        // 茶葉蛋剩餘庫存
+  eggExtra: 0,        // 無滿房預留多煮
+  riceAdult: 0.2,     // 主食新式：飯/粥 = 大人×riceAdult + 小孩×riceChild
+  riceChild: 0.1,
+  porridgeAdult: 0.2,
+  porridgeChild: 0.1,
+  specialDiv: 12      // 特殊主食 = (大人 + 小孩×0.5) / specialDiv
+};
+
 function defaultState() {
   return {
     version: 1,
-    settings: { types: JSON.parse(JSON.stringify(DEFAULT_TYPES)) },
+    settings: {
+      types: JSON.parse(JSON.stringify(DEFAULT_TYPES)),
+      prep: Object.assign({}, DEFAULT_PREP)
+    },
     rooms: [],        // [{ roomNumber:'101', breakfastType:'hot' }]
     daily: {}         // { '2026-08-23': { '101':'completed' } } 未記錄者視為 pending
   };
@@ -40,7 +58,10 @@ function loadState() {
     const base = defaultState();
     return {
       version: 1,
-      settings: { types: Array.isArray(data.settings?.types) && data.settings.types.length ? data.settings.types : base.settings.types },
+      settings: {
+        types: Array.isArray(data.settings?.types) && data.settings.types.length ? data.settings.types : base.settings.types,
+        prep: Object.assign({}, DEFAULT_PREP, (data.settings && data.settings.prep) || {})
+      },
       rooms: Array.isArray(data.rooms) ? sanitizeRooms(data.rooms) : [],
       daily: (data.daily && typeof data.daily === 'object') ? data.daily : {}
     };
@@ -67,7 +88,11 @@ function sanitizeRooms(rooms) {
     const no = normalizeRoomNo(r?.roomNumber ?? r?.roomNumber);
     if (!no || seen.has(no)) continue;
     seen.add(no);
-    if ('adult' in r) {
+    if ('infant' in r) {
+      // 新訂單格式（I~M）：房號與來源唯讀，其餘可改
+      const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
+      out.push({ roomNumber: no, source: r.source || '', roomType: r.roomType || '', adult: num(r.adult), child: num(r.child), infant: num(r.infant), mealTime: r.mealTime || '', breakfastType: (r.breakfastType === 'hot' || r.breakfastType === 'normal') ? r.breakfastType : 'normal' });
+    } else if ('adult' in r) {
       out.push({ roomNumber: no, source: r.source || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '', child: r.child || '', mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
     } else {
       out.push({ roomNumber: no, breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
@@ -131,7 +156,23 @@ function toggleStatus(dateKey, roomNumber) {
   return next;
 }
 
+function isOrderMode() { return state.rooms.length && state.rooms[0] && 'infant' in state.rooms[0]; }
+// 訂單來源分流：手動/官網＝熟食，其餘＝一般
+function isHotSource(src) { return /手動|官網/.test(String(src || '')); }
+function orderKid(r) { return (Number(r.child) || 0) + (Number(r.infant) || 0); }
+function orderTotal(r) { return (Number(r.adult) || 0) + orderKid(r); }
+
 function computeStats(dateKey) {
+  if (isOrderMode()) {
+    let hot = 0, normal = 0, completed = 0;
+    for (const r of state.rooms) {
+      if (r.breakfastType === 'hot') hot++;
+      else normal++;
+      if (getStatus(dateKey, r.roomNumber) === STATUS.COMPLETED) completed++;
+    }
+    const total = state.rooms.length;
+    return { hot, normal, addon: 0, completed, pending: total - completed, total };
+  }
   if (isBreakfast8Mode()) {
     let hot = 0, normal = 0, addon = 0, completed = 0;
     for (const r of state.rooms) {
@@ -202,8 +243,8 @@ function render() {
   // 空白狀態
   const empty = state.rooms.length === 0;
   $('emptyState').classList.toggle('hidden', !empty);
-  // 8欄模式兩欄同時顯示，不用 chips 篩選
-  if (isBreakfast8Mode()) $('filterChips').classList.add('hidden');
+  // 8欄 / 新訂單模式兩欄同時顯示，不用 chips 篩選
+  if (isOrderMode() || isBreakfast8Mode()) $('filterChips').classList.add('hidden');
   else $('filterChips').classList.toggle('hidden', empty);
   banner.classList.toggle('hidden', empty);
 
@@ -254,8 +295,76 @@ function attachDirectionLock(el) {
   el.addEventListener('touchend', () => { locked = null; }, { passive: true });
   el.addEventListener('touchcancel', () => { locked = null; }, { passive: true });
 }
+// ===== 新訂單模式渲染（I~M 格式）=====
+// 房號與來源唯讀；大人 / 小孩(孩童+嬰幼兒合併) / 時間可改（✎ 編輯）
+function renderOrderGrid(tk) {
+  const grid = $('roomGrid');
+  grid.style.display = 'block';
+  grid.style.gridTemplateColumns = 'none';
+  const all = sortRooms(state.rooms);
+  const hotList = all.filter(r => r.breakfastType === 'hot');
+  const normalList = all.filter(r => r.breakfastType !== 'hot');
+  const mkRow = (r) => {
+    const st = getStatus(tk, r.roomNumber);
+    const done = st === STATUS.COMPLETED;
+    const kid = orderKid(r);
+    return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}">
+      <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}<div style="font-size:11px;font-weight:400;color:#868e96">${escapeHtml(r.roomType || '')}</div></td>
+      <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
+      <td style="text-align:center;font-weight:700">${escapeHtml(r.adult ?? '')}</td>
+      <td style="text-align:center">${escapeHtml(kid || '')}</td>
+      <td style="font-size:12px">${escapeHtml(r.mealTime || '')}<button data-orderedit="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button></td>
+      <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
+    </tr>`;
+  };
+  const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=6 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
+  const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=6 style="text-align:center;padding:20px;color:#868e96">無一般</td></tr>';
+  grid.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:100%">
+      <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
+        <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
+        <div class="pane-scroll" data-pane="hot">
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
+        </div>
+      </div>
+      <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
+        <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">一般</div>
+        <div class="pane-scroll" data-pane="normal">
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
+        </div>
+      </div>
+    </div>`;
+  grid.querySelectorAll('.pane-scroll').forEach(attachDirectionLock);
+  grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
+    if (e.target.closest('[data-orderedit]')) return;
+    const next = toggleStatus(tk, tr.dataset.room);
+    if (navigator.vibrate) navigator.vibrate(next === STATUS.COMPLETED ? 20 : 8);
+    toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
+  }));
+  grid.querySelectorAll('[data-orderedit]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openOrderEdit(btn.dataset.orderedit);
+  }));
+}
+
+let orderEditTarget = null;
+function openOrderEdit(roomNo) {
+  const room = state.rooms.find(r => r.roomNumber === roomNo);
+  if (!room) return;
+  orderEditTarget = roomNo;
+  $('orderEditTitle').textContent = `房號 ${roomNo}`;
+  $('orderEditSource').textContent = `來源：${room.source || ''}（不可更改）`;
+  $('orderAdultInput').value = room.adult ?? '';
+  $('orderChildInput').value = room.child ?? '';
+  $('orderInfantInput').value = room.infant ?? '';
+  $('orderTimeInput').value = room.mealTime || '';
+  openModal('orderEditModal');
+}
+
 function renderGrid(tk) {
   const grid = $('roomGrid');
+  // 新訂單模式（I~M）：熟食｜一般 兩欄，房號與來源唯讀
+  if (isOrderMode()) { renderOrderGrid(tk); return; }
   // 8欄兩欄模式：熟食｜一般 每房一橫排
   if (isBreakfast8Mode()) {
     // 讓兩欄寬度與橘棒一致：取消 grid 原有卡片佈局
@@ -528,6 +637,75 @@ function parseImport(text) {
   return { rows, issues, delim, hasHeader };
 }
 
+// ===== 新訂單格式解析（I~M：房型房號/成人/孩童/嬰幼兒/訂單來源）=====
+// 房號含 N 完整保留（如 212N）；一格多房以 / 分隔，依房型人數依序分配
+function extractOrderRoomNo(seg) {
+  const m = String(seg || '').trim().match(/^(\d+)\s*([Nn])?/);
+  if (!m) return '';
+  return m[1] + (m[2] ? 'N' : '');
+}
+function roomCapacity(seg) {
+  const s = String(seg || '');
+  const m = s.match(/(\d+)\s*人房/);
+  let cap = m ? parseInt(m[1], 10) : 2;
+  if (/加[大]?床/.test(s)) cap += 1;
+  return cap;
+}
+function parseOrderMatrix(matrix) {
+  if (!matrix || !matrix.length) return null;
+  const norm = matrix.map(row => (Array.isArray(row) ? row : [row]).map(c => String(c ?? '').trim()));
+  // 找標題列（含 房型房號）
+  let hr = -1;
+  for (let i = 0; i < Math.min(5, norm.length); i++) {
+    if (norm[i].some(c => c.includes('房型房號'))) { hr = i; break; }
+  }
+  if (hr === -1) return null;
+  const header = norm[hr];
+  const findCol = (re, fallback) => {
+    const idx = header.findIndex(c => re.test(c));
+    return idx >= 0 ? idx : fallback;
+  };
+  // 預設 I~M（0-indexed 8~12）
+  const roomCol = findCol(/房型房號/, 8);
+  const adultCol = findCol(/^成人/, 9);
+  const childCol = findCol(/孩童/, 10);
+  const infantCol = findCol(/嬰幼/, 11);
+  const srcCol = findCol(/訂單來源/, 12);
+
+  const num = (v) => { const n = Number(String(v || '').trim()); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; };
+  const byNo = new Map();
+  const issues = [];
+  for (let i = hr + 1; i < norm.length; i++) {
+    const r = norm[i];
+    const cell = (r[roomCol] || '').trim();
+    if (!cell) continue;
+    const segs = cell.split(/[\/／、\n]+/).map(s => s.trim()).filter(Boolean);
+    const infos = segs.map(seg => ({ seg, no: extractOrderRoomNo(seg), cap: roomCapacity(seg) })).filter(x => x.no);
+    if (!infos.length) continue;
+    const src = (r[srcCol] || '').trim();
+    let remA = num(r[adultCol]), remC = num(r[childCol]), remI = num(r[infantCol]);
+    infos.forEach((info, idx) => {
+      const last = idx === infos.length - 1;
+      let space = info.cap;
+      const take = (rem) => last ? rem : Math.min(rem, space);
+      const a = take(remA); remA -= a; space -= a;
+      const c = take(remC); remC -= c; space -= c;
+      const inf = take(remI); remI -= inf; space -= inf;
+      const rec = {
+        roomNumber: info.no, roomType: info.seg, source: src,
+        adult: a, child: c, infant: inf, mealTime: '',
+        breakfastType: isHotSource(src) ? 'hot' : 'normal'
+      };
+      if (byNo.has(info.no)) issues.push(`房號 ${info.no} 重複，以最後一筆為準`);
+      byNo.set(info.no, rec);
+    });
+  }
+  const rows = [...byNo.values()];
+  if (!rows.length) return null;
+  rows.sort((a, b) => numericAwareSort(a.roomNumber, b.roomNumber));
+  return { rows, issues, isOrder: true };
+}
+
 // ===== 早餐統計 8欄專用解析（102~512可視+規則）=====
 function parseBreakfastMatrix(matrix, sheetMeta) {
   // sheetMeta: { hiddenRows:Set }
@@ -625,6 +803,12 @@ async function parseExcelFile(file) {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: false });
   if (!wb.SheetNames.length) throw new Error('Excel 無工作表');
+  // 優先試新訂單格式（I~M：房型房號/成人/孩童/嬰幼兒/訂單來源）
+  for (const name of wb.SheetNames) {
+    const m = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '', raw: false, blankrows: false });
+    const po = parseOrderMatrix(m);
+    if (po && po.rows.length) return po;
+  }
   // 優先找 早餐統計
   let targetName = wb.SheetNames.find(n => n.includes('早餐')) || wb.SheetNames[0];
   let sheet = wb.Sheets[targetName];
@@ -651,7 +835,15 @@ async function parseExcelFile(file) {
 
 function showImportPreview(parsed) {
   importDraft = parsed;
-  if (parsed.isBreakfast8) {
+  if (parsed.isOrder) {
+    // 新訂單預覽：房號 / 房型 / 來源 / 大人 / 小孩(孩童+嬰幼兒)
+    const hotCount = parsed.rows.filter(r => r.breakfastType === 'hot').length;
+    let tA = 0, tC = 0, tI = 0;
+    parsed.rows.forEach(r => { tA += r.adult; tC += r.child; tI += r.infant; });
+    $('importSummary').innerHTML = `共判讀到 <b>${parsed.rows.length}</b> 間<br>熟食 ${hotCount} 間　一般 ${parsed.rows.length - hotCount} 間<br>成人 ${tA}　孩童 ${tC}　嬰幼兒 ${tI}`;
+    $('importIssues').innerHTML = parsed.issues.slice(0, 8).map(i => `<div class="issue">${escapeHtml(i)}</div>`).join('') + (parsed.issues.length > 8 ? `<div class="issue">…另有 ${parsed.issues.length - 8} 項</div>` : '');
+    $('importPreviewList').innerHTML = `<div style="overflow:auto"><table style="width:100%;font-size:13px;border-collapse:collapse"><tr><th>房號</th><th>房型</th><th>來源</th><th>大人</th><th>小孩</th></tr>` + parsed.rows.slice(0, 40).map(r => `<tr><td>${escapeHtml(r.roomNumber)}</td><td style="font-size:11px">${escapeHtml(r.roomType)}</td><td>${escapeHtml(r.source)}</td><td style="text-align:center">${r.adult}</td><td style="text-align:center">${r.child + r.infant}</td></tr>`).join('') + `</table>` + (parsed.rows.length > 40 ? `<div class="hint" style="text-align:center;padding:6px">…其餘 ${parsed.rows.length - 40} 筆</div>` : '') + `</div>`;
+  } else if (parsed.isBreakfast8) {
     // 8欄預覽
     $('importSummary').innerHTML = `共判讀到 <b>${parsed.rows.length}</b> 間（102~512可視）<br>已套用規則：不|加|購→不加購、續住→住宿狀態`;
     $('importIssues').innerHTML = parsed.issues.slice(0, 8).map(i => `<div class="issue">${escapeHtml(i)}</div>`).join('') + (parsed.issues.length > 8 ? `<div class="issue">…另有 ${parsed.issues.length - 8} 項</div>` : '');
@@ -697,7 +889,14 @@ function handleFile(file) {
 
 function confirmImport() {
   if (!importDraft) return;
-  if (importDraft.isBreakfast8) {
+  if (importDraft.isOrder) {
+    // 新訂單存法：房號與來源唯讀，其餘可改
+    state.rooms = sortRooms(importDraft.rows.map(r => ({
+      roomNumber: r.roomNumber, roomType: r.roomType, source: r.source,
+      adult: r.adult, child: r.child, infant: r.infant, mealTime: '',
+      breakfastType: r.breakfastType
+    })));
+  } else if (importDraft.isBreakfast8) {
     // 8欄存法：保留完整欄位
     state.rooms = sortRooms(importDraft.rows.map(r => ({
       roomNumber: r.roomNumber, source: r.source, status: r.status, eggMilk: r.eggMilk, vegan: r.vegan, adult: r.adult, child: r.child, mealTime: r.mealTime, payStatus: '', breakfastType: (r.adult || r.child) ? 'hot' : 'normal'
@@ -713,10 +912,110 @@ function confirmImport() {
   toast(`✅ 已匯入 ${state.rooms.length} 間房號`);
 }
 
+// ===== 備料區 =====
+function getPrep() {
+  return Object.assign({}, DEFAULT_PREP, (state.settings && state.settings.prep) || {});
+}
+function savePrep(patch) {
+  state.settings.prep = Object.assign(getPrep(), patch);
+  saveState();
+}
+function calcPrepTotals() {
+  let A = 0, C = 0, I = 0, hotRooms = 0, hotP = 0;
+  for (const r of state.rooms) {
+    const a = Number(r.adult) || 0, c = Number(r.child) || 0, i = Number(r.infant) || 0;
+    A += a; C += c; I += i;
+    if (r.breakfastType === 'hot') { hotRooms++; hotP += a + c + i; }
+  }
+  return { A, C, I, total: A + C + I, rooms: state.rooms.length, hotRooms, hotPeople: hotP };
+}
+function calcPrep() {
+  const p = getPrep();
+  const t = calcPrepTotals();
+  const jellyTotal = Math.max(0, Math.round(t.total * Number(p.jellyRatio) - Number(p.jellyStock)));
+  const cheese = Math.round(jellyTotal / (Number(p.cheeseDiv) || 4));
+  const jelly = Math.max(0, jellyTotal - cheese);
+  const eggTotal = Math.max(0, Math.round(t.total * Number(p.eggRatio) - Number(p.eggStock) + (Number(p.eggExtra) || 0)));
+  const kid = t.C + t.I; // 小孩＝孩童＋嬰幼兒
+  const r1 = v => Math.round(v * 10) / 10;
+  const rice = r1(t.A * Number(p.riceAdult) + kid * Number(p.riceChild));
+  const porridge = r1(t.A * Number(p.porridgeAdult) + kid * Number(p.porridgeChild));
+  const special = r1((t.A + kid * 0.5) / (Number(p.specialDiv) || 12));
+  return { t, kid, jellyTotal, cheese, jelly, eggTotal, rice, porridge, special };
+}
+function openPrep() {
+  if (!isOrderMode() && state.rooms.length) { toast('備料區僅支援新訂單格式匯入的資料'); return; }
+  const p = getPrep();
+  $('jellyRatio').value = p.jellyRatio;
+  $('jellyStock').value = p.jellyStock;
+  $('cheeseDiv').value = p.cheeseDiv;
+  $('eggRatio').value = p.eggRatio;
+  $('eggStock').value = p.eggStock;
+  $('eggExtra').value = p.eggExtra;
+  $('riceAdult').value = p.riceAdult;
+  $('riceChild').value = p.riceChild;
+  $('porridgeAdult').value = p.porridgeAdult;
+  $('porridgeChild').value = p.porridgeChild;
+  $('specialDiv').value = p.specialDiv;
+  renderPrep();
+  openModal('prepModal');
+}
+function renderPrep() {
+  const c = calcPrep();
+  $('prepSumLine').innerHTML = `成人 <b>${c.t.A}</b>　孩童 <b>${c.t.C}</b>　嬰幼兒 <b>${c.t.I}</b>＝總人數 <b>${c.t.total}</b>`;
+  $('prepHotLine').innerHTML = `熟食區 <b>${c.t.hotRooms}</b> 間 / <b>${c.t.hotPeople}</b> 人（共 ${c.t.rooms} 間）`;
+  $('jellyTotal').textContent = c.jellyTotal;
+  $('cheeseNum').textContent = c.cheese;
+  $('jellyNum').textContent = c.jelly;
+  $('eggTotal').textContent = c.eggTotal;
+  $('riceNum').textContent = c.rice;
+  $('porridgeNum').textContent = c.porridge;
+  $('specialNum').textContent = c.special;
+  $('prepKidNote').textContent = `小孩＝孩童 ${c.t.C}＋嬰幼兒 ${c.t.I}＝${c.kid}`;
+}
+function collectPrep() {
+  const num = (id, fb) => {
+    const v = Number($(id).value);
+    return Number.isFinite(v) && v >= 0 ? v : fb;
+  };
+  const d = DEFAULT_PREP;
+  savePrep({
+    jellyRatio: num('jellyRatio', d.jellyRatio),
+    jellyStock: num('jellyStock', d.jellyStock),
+    cheeseDiv: num('cheeseDiv', d.cheeseDiv),
+    eggRatio: num('eggRatio', d.eggRatio),
+    eggStock: num('eggStock', d.eggStock),
+    eggExtra: num('eggExtra', d.eggExtra),
+    riceAdult: num('riceAdult', d.riceAdult),
+    riceChild: num('riceChild', d.riceChild),
+    porridgeAdult: num('porridgeAdult', d.porridgeAdult),
+    porridgeChild: num('porridgeChild', d.porridgeChild),
+    specialDiv: num('specialDiv', d.specialDiv)
+  });
+  renderPrep();
+}
+
 // ===== 匯出 =====
 function exportToday() {
   const tk = todayKey();
   if (!state.rooms.length) { toast('目前沒有房號可匯出'); return; }
+  if (isOrderMode()) {
+    const rows = [['日期', '房號', '房型', '來源', '大人', '小孩', '嬰幼兒', '用餐狀態']];
+    for (const r of sortRooms(state.rooms)) {
+      const done = getStatus(tk, r.roomNumber) === STATUS.COMPLETED;
+      rows.push([tk.replace(/-/g, '/'), r.roomNumber, r.roomType || '', r.source || '', r.adult, orderKid(r), r.infant, done ? '已用餐' : '未用餐']);
+    }
+    const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `早餐紀錄_${tk}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    closeModal('menuModal');
+    toast('📤 已匯出今日紀錄');
+    return;
+  }
   const rows = [['日期', '房號', '早餐種類', '用餐狀態']];
   for (const r of sortRooms(state.rooms)) {
     const done = getStatus(tk, r.roomNumber) === STATUS.COMPLETED;
@@ -772,6 +1071,34 @@ function bindEvents() {
   $('menuManageBtn').addEventListener('click', () => { closeModal('menuModal'); openManage(); });
   $('menuImportBtn').addEventListener('click', () => { closeModal('menuModal'); $('fileInput').click(); });
   $('menuExportBtn').addEventListener('click', exportToday);
+  $('menuPrepBtn').addEventListener('click', () => { closeModal('menuModal'); openPrep(); });
+
+  // 備料區：比例更改即時重算並儲存
+  $('prepModal').querySelectorAll('input[type="number"]').forEach(inp => {
+    inp.addEventListener('change', collectPrep);
+  });
+  $('prepCloseBtn').addEventListener('click', () => closeModal('prepModal'));
+
+  // 新訂單房號編輯：房號與來源唯讀，其餘可改
+  $('orderSaveBtn').addEventListener('click', () => {
+    const room = state.rooms.find(r => r.roomNumber === orderEditTarget);
+    if (room) {
+      const num = (id) => {
+        const v = Number($(id).value);
+        return Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+      };
+      room.adult = num('orderAdultInput');
+      room.child = num('orderChildInput');
+      room.infant = num('orderInfantInput');
+      room.mealTime = $('orderTimeInput').value.trim();
+      saveState();
+      render();
+    }
+    closeModal('orderEditModal');
+    orderEditTarget = null;
+    toast('已更新');
+  });
+  $('orderCancelBtn').addEventListener('click', () => { orderEditTarget = null; closeModal('orderEditModal'); });
 
   $('emptyAddBtn').addEventListener('click', openManage);
   $('emptyImportBtn').addEventListener('click', () => $('fileInput').click());
