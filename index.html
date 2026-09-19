@@ -91,6 +91,7 @@
     <button class="btn list-btn" id="menuManageBtn">🏠 管理房號</button>
     <button class="btn list-btn" id="menuImportBtn">📂 匯入資料（Excel / CSV）</button>
     <button class="btn list-btn" id="menuPrepBtn">🧮 備料區</button>
+    <button class="btn list-btn" id="menuSlotsBtn">🍳 早餐用餐時間</button>
     <button class="btn list-btn" id="menuExportBtn">📤 匯出今日紀錄</button>
     <button class="btn list-btn subtle" id="menuCloseBtn">關閉</button>
   </div>
@@ -264,11 +265,37 @@
   </div>
 </div>
 
+<!-- 早餐用餐時間設定 -->
+<div class="modal-backdrop hidden" id="mealSlotsModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>🍳 早餐用餐時間</h2>
+    <p class="hint">時段勾選後會常駐，作為主頁面時間欄的選項。</p>
+    <div class="add-row">
+      <input type="text" id="slotsInput" inputmode="text" placeholder="例如 8:15">
+      <button class="btn primary" id="slotsAddBtn">新增</button>
+    </div>
+    <div class="manage-list" id="slotsList"></div>
+    <button class="btn subtle full" id="slotsCloseBtn">完成</button>
+  </div>
+</div>
+
+<!-- 時間欄位快速選擇 -->
+<div class="modal-backdrop hidden" id="timePickerModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="timePickerTitle">用餐時間</h2>
+    <div class="manage-list" id="timePickerOptions"></div>
+    <button class="btn subtle full" id="timePickerCloseBtn">取消</button>
+  </div>
+</div>
+
 <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt,.tsv" hidden>
 
 <div id="toast" class="toast hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="./core.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
