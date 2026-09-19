@@ -1433,7 +1433,7 @@ function openTimePicker(roomNo) {
       if (!room2) return;
       room2.mealTime = btn.dataset.timeValue;
       saveState();
-      renderGrid(todayKey());
+      render();
       closeModal('timePickerModal');
       timePickerTarget = null;
       toast(btn.dataset.timeValue ? `✅ ${room2.roomNumber} 時間：${btn.dataset.timeValue}` : `${room2.roomNumber} 已清除用餐時間`);
