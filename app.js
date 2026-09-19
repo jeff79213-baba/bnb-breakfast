@@ -1283,6 +1283,7 @@ function bindEvents() {
     toast(moved ? `已改房 ${oldNo} → ${newNo}` : '已更新');
   });
   $('orderCancelBtn').addEventListener('click', () => { orderEditTarget = null; closeModal('orderEditModal'); });
+  $('orderTimeInput').addEventListener('click', openOrderTimePicker);
 
   $('emptyAddBtn').addEventListener('click', openManage);
   $('emptyImportBtn').addEventListener('click', () => $('fileInput').click());
@@ -1410,11 +1411,7 @@ function openMealEdit(roomNo, mode) {
 }
 
 let timePickerTarget = null;
-function openTimePicker(roomNo) {
-  const room = state.rooms.find(r => r.roomNumber === roomNo);
-  if (!room) return;
-  timePickerTarget = roomNo;
-  $('timePickerTitle').textContent = `房號 ${roomNo} 用餐時間`;
+function renderTimePickerOptions(onPick) {
   const slots = C.enabledSlots(state.settings.mealSlots);
   const wrap = $('timePickerOptions');
   let html = '';
@@ -1428,16 +1425,35 @@ function openTimePicker(roomNo) {
   html += `<button type="button" class="btn" data-time-value="" style="min-height:52px;width:100%">清除（空白）</button>`;
   wrap.innerHTML = html;
   wrap.querySelectorAll('[data-time-value]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const room2 = state.rooms.find(x => x.roomNumber === timePickerTarget);
-      if (!room2) return;
-      room2.mealTime = btn.dataset.timeValue;
-      saveState();
-      render();
-      closeModal('timePickerModal');
-      timePickerTarget = null;
-      toast(btn.dataset.timeValue ? `✅ ${room2.roomNumber} 時間：${btn.dataset.timeValue}` : `${room2.roomNumber} 已清除用餐時間`);
-    });
+    btn.addEventListener('click', () => onPick(btn.dataset.timeValue));
+  });
+}
+
+function openTimePicker(roomNo) {
+  const room = state.rooms.find(r => r.roomNumber === roomNo);
+  if (!room) return;
+  timePickerTarget = roomNo;
+  $('timePickerTitle').textContent = `房號 ${roomNo} 用餐時間`;
+  renderTimePickerOptions((value) => {
+    const room2 = state.rooms.find(x => x.roomNumber === timePickerTarget);
+    if (!room2) return;
+    room2.mealTime = value;
+    saveState();
+    render();
+    closeModal('timePickerModal');
+    timePickerTarget = null;
+    toast(value ? `✅ ${room2.roomNumber} 時間：${value}` : `${room2.roomNumber} 已清除用餐時間`);
+  });
+  openModal('timePickerModal');
+}
+
+function openOrderTimePicker() {
+  const room = state.rooms.find(r => r.roomNumber === orderEditTarget);
+  if (!room) return;
+  $('timePickerTitle').textContent = `房號 ${room.roomNumber} 用餐時間`;
+  renderTimePickerOptions((value) => {
+    $('orderTimeInput').value = value;
+    closeModal('timePickerModal');
   });
   openModal('timePickerModal');
 }
