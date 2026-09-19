@@ -1,0 +1,101 @@
+'use strict';
+const { test } = require('node:test');
+const assert = require('node:assert');
+const C = require('../core.js');
+
+const hotSrcRoom = { roomNumber: '101', source: '官網', vegan: '', eggMilk: '' };
+const platformRoom = { roomNumber: '312', source: 'Booking.com', vegan: '', eggMilk: '' };
+const addonRoom = { roomNumber: '308', source: 'Agoda', vegan: '', eggMilk: '加購' };
+const noAddRoom = { roomNumber: '507', source: '官網', vegan: '不加購', eggMilk: '' };
+const noMealRoom = { roomNumber: '102', source: '手動訂單', vegan: '', eggMilk: '', mealTime: '不用餐' };
+
+test('isHotSource: 手動/官網/官網訂單為熟食來源，其餘不是', () => {
+  assert.strictEqual(C.isHotSource('手動訂單'), true);
+  assert.strictEqual(C.isHotSource('官網訂單'), true);
+  assert.strictEqual(C.isHotSource('官網'), true);
+  assert.strictEqual(C.isHotSource('Booking.com'), false);
+  assert.strictEqual(C.isHotSource(''), false);
+  assert.strictEqual(C.isHotSource(undefined), false);
+});
+
+test('isAddon: eggMilk 含加購即為真', () => {
+  assert.strictEqual(C.isAddon(addonRoom), true);
+  assert.strictEqual(C.isAddon({ eggMilk: '蛋奶加購' }), true);
+  assert.strictEqual(C.isAddon(platformRoom), false);
+  assert.strictEqual(C.isAddon(undefined), false);
+});
+
+test('isNoAdd: vegan === 不加購', () => {
+  assert.strictEqual(C.isNoAdd(noAddRoom), true);
+  assert.strictEqual(C.isNoAdd(platformRoom), false);
+});
+
+test('isHotRoom / isPlatformRoom: 真理表', () => {
+  assert.strictEqual(C.isHotRoom(hotSrcRoom), true);     // 官網 → 熟食
+  assert.strictEqual(C.isHotRoom(platformRoom), false);  // Booking → 平台
+  assert.strictEqual(C.isHotRoom(addonRoom), true);      // Agoda+加購 → 熟食
+  assert.strictEqual(C.isHotRoom(noAddRoom), false);     // 官網但不加購 → 平台
+  assert.strictEqual(C.isPlatformRoom(platformRoom), true);
+  assert.strictEqual(C.isPlatformRoom(hotSrcRoom), false);
+});
+
+test('isNoMeal: mealTime === 不用餐', () => {
+  assert.strictEqual(C.isNoMeal(noMealRoom), true);
+  assert.strictEqual(C.isNoMeal(hotSrcRoom), false);
+});
+
+test('computeHotPending: 熟食區未用餐且扣除不用餐', () => {
+  const rooms = [hotSrcRoom, platformRoom, addonRoom, noAddRoom, noMealRoom];
+  const statusOf = () => 'pending'; // 全部未用餐
+  // 熟食 = 101, 308；207 平台、507 不加購(平台)、102 不用餐(扣除)
+  assert.strictEqual(C.computeHotPending(rooms, statusOf), 2);
+  const allDone = () => 'completed';
+  assert.strictEqual(C.computeHotPending(rooms, allDone), 0);
+});
+
+test('computeStats: 熟食含加購、熟食+平台=總數', () => {
+  const rooms = [hotSrcRoom, platformRoom, addonRoom, noAddRoom];
+  const statusOf = (r) => (r.roomNumber === '101' ? 'completed' : 'pending');
+  const s = C.computeStats(rooms, statusOf);
+  assert.strictEqual(s.hot, 2);        // 101(官網) + 308(加購)
+  assert.strictEqual(s.normal, 2);     // 312 + 507(不加購)
+  assert.strictEqual(s.addon, 1);      // 308
+  assert.strictEqual(s.completed, 1);
+  assert.strictEqual(s.pending, 3);
+  assert.strictEqual(s.total, 4);
+});
+
+test('normalizeSlots / addSlot / enabledSlots: 時段操作', () => {
+  assert.deepStrictEqual(C.normalizeSlots([' 8:15 ', '', ' 9:30']), ['8:15', '9:30']);
+  assert.deepStrictEqual(C.normalizeSlots(undefined), []);
+
+  let slots = C.addSlot([], '8:15');
+  slots = C.addSlot(slots, '8:15');       // 重複不加
+  slots = C.addSlot(slots, ' 9:30 ');     // 去空白
+  slots = C.addSlot(slots, '');           // 空不加
+  assert.deepStrictEqual(slots, [{ label: '8:15', enabled: true }, { label: '9:30', enabled: true }]);
+
+  const mixed = [{ label: '8:15', enabled: true }, { label: '9:30', enabled: false }, { label: ' 10:00 ', enabled: true }];
+  assert.deepStrictEqual(C.enabledSlots(mixed), ['8:15', '10:00']);
+  assert.deepStrictEqual(C.enabledSlots([]), []);
+});
+
+test('assignGroupColors: 依 orderId 分組、空 orderId 退 source、穩定', () => {
+  const palette = ['#e64980', '#9775fa', '#4dabf7'];
+  const rooms = [
+    { roomNumber: '106', orderId: 'A', source: '官網' },
+    { roomNumber: '301', orderId: 'A', source: '官網' },
+    { roomNumber: '508', orderId: 'A', source: '官網' },
+    { roomNumber: '312', orderId: '', source: '短租' },
+    { roomNumber: '507', orderId: '', source: '短租' },
+    { roomNumber: '101', orderId: '', source: 'Booking.com' },
+  ];
+  const m = C.assignGroupColors(rooms, palette);
+  assert.strictEqual(m['106'], m['301']);  // 同訂單同色
+  assert.strictEqual(m['301'], m['508']);
+  assert.strictEqual(m['312'], m['507']);  // 同來源同色
+  assert.notStrictEqual(m['312'], m['101']);
+  const m2 = C.assignGroupColors(rooms, palette);
+  assert.strictEqual(m['106'], m2['106']); // 穩定
+  assert.strictEqual(m['312'], m2['312']);
+});
