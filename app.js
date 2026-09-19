@@ -305,7 +305,7 @@ function renderOrderGrid(tk) {
     const kid = orderKid(r);
     const yellowBadge = (isAdd && !r.payStatus) ? `<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">${escapeHtml(r.eggMilk)}</span>` : '';
     const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
-    return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}${color ? 'border-bottom:5px solid ' + color + ';' : ''}">
+    return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}${color ? ';border-bottom:5px solid ' + color + ';' : ''}">
       <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
       <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
       <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
@@ -405,7 +405,7 @@ function renderGrid(tk) {
       // 匯入即加購（無付款狀態）→ 黃底「加購」；現場改加購 → 房號下方顯示 已付/待付
       const yellowBadge = (isAdd && !r.payStatus) ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : '';
       const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
-      return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}${color ? 'border-bottom:5px solid ' + color + ';' : ''}">
+      return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}${color ? ';border-bottom:5px solid ' + color + ';' : ''}">
         <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
         <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
         <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
