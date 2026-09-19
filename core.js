@@ -81,6 +81,25 @@
       .map(x => String(x.label).trim());
   }
 
+  function timeOf(label) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(label == null ? '' : label).trim());
+    if (!m) return null;
+    const h = Number(m[1]), min = Number(m[2]);
+    if (h < 1 || h > 12 || min < 0 || min > 59 || min % 5 !== 0) return null;
+    return { h, m: min };
+  }
+
+  function sortSlots(slots) {
+    if (!Array.isArray(slots)) return [];
+    return slots.slice().sort((a, b) => {
+      const ta = timeOf(a && a.label), tb = timeOf(b && b.label);
+      if (ta && tb) return ta.h - tb.h || ta.m - tb.m;
+      if (ta) return -1;
+      if (tb) return 1;
+      return 0;
+    });
+  }
+
   function groupKeyOf(r) {
     if (r && r.orderId && String(r.orderId).trim()) return 'order:' + String(r.orderId).trim();
     return 'src:' + String(r && r.source ? r.source : '').trim();
@@ -101,6 +120,6 @@
   return {
     HOT_SOURCES, isHotSource, isNoAdd, isAddon, isHotRoom, isPlatformRoom,
     isNoMeal, computeHotPending, computeStats, normalizeSlots, addSlot,
-    enabledSlots, groupKeyOf, assignGroupColors
+    enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors
   };
 });

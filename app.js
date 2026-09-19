@@ -69,7 +69,7 @@ function loadState() {
       settings: {
         types: Array.isArray(data.settings?.types) && data.settings.types.length ? data.settings.types : base.settings.types,
         prep: Object.assign({}, DEFAULT_PREP, (data.settings && data.settings.prep) || {}),
-        mealSlots: Array.isArray(data.settings?.mealSlots) ? data.settings.mealSlots : []
+        mealSlots: C ? C.sortSlots(Array.isArray(data.settings?.mealSlots) ? data.settings.mealSlots : []) : []
       },
       rooms: Array.isArray(data.rooms) ? sanitizeRooms(data.rooms) : [],
       daily: (data.daily && typeof data.daily === 'object') ? data.daily : {}
@@ -576,7 +576,7 @@ function getMealSlots() {
   return Array.isArray(state.settings.mealSlots) ? state.settings.mealSlots : [];
 }
 function saveMealSlots() {
-  state.settings.mealSlots = getMealSlots();
+  state.settings.mealSlots = C.sortSlots(getMealSlots());
   saveState();
 }
 function renderSlotsList() {

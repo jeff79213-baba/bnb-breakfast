@@ -80,6 +80,20 @@ test('normalizeSlots / addSlot / enabledSlots: 時段操作', () => {
   assert.deepStrictEqual(C.enabledSlots([]), []);
 });
 
+test('sortSlots: 依時間由小到大，無法解析的放最後', () => {
+  const slots = [
+    { label: '9:30', enabled: true },
+    { label: '8:15', enabled: true },
+    { label: '10:00', enabled: true },
+    { label: '早餐後', enabled: false },
+    { label: '12:05', enabled: true },
+  ];
+  const sorted = C.sortSlots(slots);
+  assert.deepStrictEqual(sorted.map(s => s.label), ['8:15', '9:30', '10:00', '12:05', '早餐後']);
+  assert.strictEqual(sorted[4].enabled, false);
+  assert.strictEqual(C.sortSlots(undefined).length, 0);
+});
+
 test('assignGroupColors: 依 orderId 分組、空 orderId 退 source、穩定', () => {
   const palette = ['#e64980', '#9775fa', '#4dabf7'];
   const rooms = [
