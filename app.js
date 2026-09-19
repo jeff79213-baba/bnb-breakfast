@@ -561,6 +561,37 @@ function renderManageList() {
   }).join('');
 }
 
+// ===== 用餐時段設定 =====
+function getMealSlots() {
+  return Array.isArray(state.settings.mealSlots) ? state.settings.mealSlots : [];
+}
+function saveMealSlots() {
+  state.settings.mealSlots = getMealSlots();
+  saveState();
+}
+function renderSlotsList() {
+  const wrap = $('slotsList');
+  const slots = getMealSlots();
+  if (!slots.length) {
+    wrap.innerHTML = '<p class="hint" style="text-align:center;padding:16px 0;">尚未設定時段</p>';
+    return;
+  }
+  wrap.innerHTML = slots.map((s, i) => {
+    const label = escapeHtml(String(s.label || '').trim());
+    return `<div class="manage-item">
+      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">
+        <input type="checkbox" data-slot-check="${i}" ${s.enabled ? 'checked' : ''}>
+        <span class="room-no">${label}</span>
+      </label>
+      <button class="del-btn" data-slot-del="${i}">✕</button>
+    </div>`;
+  }).join('');
+}
+function openSlotsModal() {
+  renderSlotsList();
+  openModal('mealSlotsModal');
+}
+
 function addRoomsFromInput() {
   const raw = $('newRoomInput').value;
   const type = $('newRoomType').value;
@@ -1182,6 +1213,14 @@ function bindEvents() {
   $('menuImportBtn').addEventListener('click', () => { closeModal('menuModal'); $('fileInput').click(); });
   $('menuExportBtn').addEventListener('click', exportToday);
   $('menuPrepBtn').addEventListener('click', () => { closeModal('menuModal'); openPrep(); });
+
+  // 用餐時段設定 modal
+  $('menuSlotsBtn').addEventListener('click', () => { closeModal('menuModal'); openSlotsModal(); });
+  $('slotsAddBtn').addEventListener('click', () => { const v = $('slotsInput').value; state.settings.mealSlots = C.addSlot(getMealSlots(), v); saveMealSlots(); $('slotsInput').value = ''; renderSlotsList(); toast(v.trim() ? `已新增 ${v.trim()}` : '請輸入時段'); });
+  $('slotsInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('slotsAddBtn').click(); });
+  $('slotsCloseBtn').addEventListener('click', () => closeModal('mealSlotsModal'));
+  $('slotsList').addEventListener('change', e => { const c = e.target.closest('input[data-slot-check]'); if (!c) return; const i = Number(c.dataset.slotCheck); const s = getMealSlots()[i]; if (s) { s.enabled = c.checked; saveMealSlots(); renderSlotsList(); } });
+  $('slotsList').addEventListener('click', e => { const b = e.target.closest('[data-slot-del]'); if (!b) return; const i = Number(b.dataset.slotDel); const s = getMealSlots()[i]; if (!s) return; state.settings.mealSlots = getMealSlots().filter((_, k) => k !== i); saveMealSlots(); renderSlotsList(); toast(`已刪除 ${s.label}`); });
 
   // 備料區：比例更改即時重算並儲存
   $('prepModal').querySelectorAll('input[type="number"]').forEach(inp => {
