@@ -599,7 +599,94 @@ function renderSlotsList() {
 }
 function openSlotsModal() {
   renderSlotsList();
+  initWheelSelector();
   openModal('mealSlotsModal');
+}
+
+let wheelHour = [];
+let wheelMin = [];
+
+function initWheelSelector() {
+  const hourCol = $('wheelHour');
+  const minCol = $('wheelMin');
+  if (!hourCol || !minCol) return;
+  hourCol.innerHTML = '';
+  minCol.innerHTML = '';
+  wheelHour = Array.from({ length: 12 }, (_, i) => String(i + 1));
+  wheelMin = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+  const filler = () => { const d = document.createElement('div'); d.className = 'wheel-spacer'; return d; };
+  hourCol.appendChild(filler());
+  wheelHour.forEach((v, i) => { const d = document.createElement('div'); d.className = 'wheel-item'; d.dataset.val = v; d.dataset.idx = i; d.textContent = v; hourCol.appendChild(d); });
+  hourCol.appendChild(filler());
+  minCol.appendChild(filler());
+  wheelMin.forEach((v, i) => { const d = document.createElement('div'); d.className = 'wheel-item'; d.dataset.val = v; d.dataset.idx = i; d.textContent = v; minCol.appendChild(d); });
+  minCol.appendChild(filler());
+
+  // 目前值（預設 8:00；若 slotsInput 已有合法值則沿用）
+  const cur = parseTime12(($('slotsInput').value || '').trim()) || { h: 8, m: 0 };
+  wheelSetIndex(hourCol, cur.h - 1);
+  wheelSetIndex(minCol, cur.m / 5);
+
+  [hourCol, minCol].forEach(col => {
+    let t = null;
+    col.addEventListener('scroll', () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { wheelSyncActive(col); wheelApply(); }, 120);
+    }, { passive: true });
+    col.addEventListener('click', e => {
+      const item = e.target.closest('.wheel-item');
+      if (!item) return;
+      const idx = Number(item.dataset.idx);
+      wheelMarkActive(col, idx);
+      col.scrollTo({ top: idx * 50, behavior: 'smooth' });
+      setTimeout(() => { wheelSyncActive(col); wheelApply(); }, 140);
+    });
+  });
+  wheelSyncActive(hourCol);
+  wheelSyncActive(minCol);
+  wheelApply();
+}
+
+function parseTime12(s) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if (!m) return null;
+  let h = Number(m[1]); const min = Number(m[2]);
+  if (h < 1 || h > 12 || min < 0 || min > 59 || min % 5 !== 0) return null;
+  return { h, m: min };
+}
+
+function wheelSetIndex(col, idx) {
+  const total = col.querySelectorAll('.wheel-item').length;
+  if (idx < 0 || idx >= total) return;
+  col.scrollTop = idx * 50;
+  wheelMarkActive(col, idx);
+}
+
+function wheelMarkActive(col, idx) {
+  col.querySelectorAll('.wheel-item').forEach(el => el.classList.toggle('active', Number(el.dataset.idx) === idx));
+}
+
+function wheelSyncActive(col) {
+  const rect = col.getBoundingClientRect();
+  const center = rect.top + rect.height / 2;
+  let best = 0, bestD = Infinity;
+  col.querySelectorAll('.wheel-item').forEach(el => {
+    const r = el.getBoundingClientRect();
+    const d = Math.abs(r.top + r.height / 2 - center);
+    if (d < bestD) { bestD = d; best = Number(el.dataset.idx); }
+  });
+  wheelMarkActive(col, best);
+}
+
+function wheelApply() {
+  const hourCol = $('wheelHour'), minCol = $('wheelMin');
+  if (!hourCol || !minCol) return;
+  const hEl = hourCol.querySelector('.active');
+  const mEl = minCol.querySelector('.active');
+  if (!hEl || !mEl) return;
+  const h = Number(hEl.dataset.val);
+  const m = Number(mEl.dataset.val);
+  $('slotsInput').value = `${h}:${String(m).padStart(2, '0')}`;
 }
 
 function addRoomsFromInput() {

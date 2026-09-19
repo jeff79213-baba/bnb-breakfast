@@ -271,8 +271,14 @@
     <div class="sheet-handle"></div>
     <h2>🍳 早餐用餐時間</h2>
     <p class="hint">時段勾選後會常駐，作為主頁面時間欄的選項。</p>
+    <div class="wheel-picker">
+      <div class="wheel-col" id="wheelHour" data-wheel="hour" tabindex="0"></div>
+      <span class="wheel-colon">:</span>
+      <div class="wheel-col" id="wheelMin" data-wheel="min" tabindex="0"></div>
+      <div class="wheel-indicator"><span class="wheel-line"></span></div>
+    </div>
     <div class="add-row">
-      <input type="text" id="slotsInput" inputmode="text" placeholder="例如 8:15">
+      <input type="text" id="slotsInput" inputmode="text" placeholder="滾輪選完自動填入" readonly>
       <button class="btn primary" id="slotsAddBtn">新增</button>
     </div>
     <div class="manage-list" id="slotsList"></div>

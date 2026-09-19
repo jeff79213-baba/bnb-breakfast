@@ -254,6 +254,64 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
 /* 管理房號 */
 .add-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; margin-bottom: 14px; }
 .add-row input { grid-column: 1 / -1; }
+
+/* 滾輪式時段選擇器 */
+.wheel-picker {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  border: 2px solid #dee2e6;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.wheel-col {
+  width: 64px;
+  height: 150px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  text-align: center;
+  touch-action: pan-y;
+}
+.wheel-col::-webkit-scrollbar { display: none; }
+.wheel-item {
+  height: 50px;
+  line-height: 50px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #adb5bd;
+  scroll-snap-align: center;
+  transition: color .12s;
+}
+.wheel-spacer { height: 50px; scroll-snap-align: center; }
+.wheel-item.active { color: var(--text); font-size: 32px; }
+.wheel-colon {
+  display: flex;
+  align-items: center;
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--text);
+  z-index: 1;
+  background: #fff;
+}
+.wheel-indicator {
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  transform: translateY(-50%);
+  height: 50px;
+  border-top: 2px solid var(--hot-color);
+  border-bottom: 2px solid var(--hot-color);
+  pointer-events: none;
+  background: rgba(230, 87, 12, .04);
+}
+}
 .manage-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .manage-item {
   display: grid;
