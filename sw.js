@@ -1,10 +1,11 @@
 /* 民宿早餐房號管理系統 - Service Worker（離線快取） */
-const CACHE_NAME = 'bnb-breakfast-v7-order-prep';
+const CACHE_NAME = 'bnb-breakfast-v8-mealslots';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './core.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
