@@ -1,5 +1,5 @@
 /* 民宿早餐房號管理系統 - Service Worker（離線快取） */
-const CACHE_NAME = 'bnb-breakfast-v8-mealslots';
+const CACHE_NAME = 'bnb-breakfast-v9-nomeal-stats';
 const APP_SHELL = [
   './',
   './index.html',
