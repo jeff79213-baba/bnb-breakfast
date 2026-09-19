@@ -313,7 +313,7 @@ function renderOrderGrid(tk) {
       <td style="font-size:12px">${escapeHtml(r.vegan || '')}${isNoAdd ? `<button data-orderaddon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
       <td style="text-align:center;font-weight:700">${escapeHtml(r.adult ?? '')}</td>
       <td style="text-align:center">${escapeHtml(kid || '')}</td>
-      <td style="font-size:12px">${escapeHtml(r.mealTime || '')}<button data-orderedit="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button></td>
+      <td style="font-size:12px;color:${r.mealTime === '不用餐' ? '#868e96;font-style:italic' : 'inherit'}" data-timeset="${escapeHtml(r.roomNumber)}">${escapeHtml(r.mealTime || '')}${r.mealTime ? '' : '<span class="hint" style="color:#adb5bd">＋</span>'}<button data-orderedit="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button></td>
       <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
     </tr>`;
   };
@@ -346,6 +346,7 @@ function renderOrderGrid(tk) {
     if (e.target.closest('[data-orderedit]')) return;
     if (e.target.closest('[data-orderaddon]')) return;
     if (e.target.closest('[data-orderrevert]')) return;
+    if (e.target.closest('[data-timeset]')) return;
     const next = toggleStatus(tk, tr.dataset.room);
     if (navigator.vibrate) navigator.vibrate(next === STATUS.COMPLETED ? 20 : 8);
     toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
@@ -361,6 +362,10 @@ function renderOrderGrid(tk) {
   grid.querySelectorAll('[data-orderrevert]').forEach(btn => btn.addEventListener('click', (e) => {
     e.stopPropagation();
     openMealEdit(btn.dataset.orderrevert, 'revert');
+  }));
+  grid.querySelectorAll('[data-timeset]').forEach(td => td.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openTimePicker(td.dataset.timeset);
   }));
 }
 
@@ -413,7 +418,7 @@ function renderGrid(tk) {
         <td style="font-size:12px">${escapeHtml(r.vegan || '')}${isNoAdd ? `<button data-addon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
         <td style="text-align:center;font-weight:700">${escapeHtml(r.adult || '')}</td>
         <td style="text-align:center">${escapeHtml(r.child || '')}</td>
-        <td style="font-size:12px">${escapeHtml(r.mealTime || '')}</td>
+        <td style="font-size:12px;color:${r.mealTime === '不用餐' ? '#868e96;font-style:italic' : 'inherit'}" data-timeset="${escapeHtml(r.roomNumber)}">${escapeHtml(r.mealTime || '')}${r.mealTime ? '' : '<span class="hint" style="color:#adb5bd">＋</span>'}</td>
         <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
       </tr>`;
     };
@@ -446,6 +451,7 @@ function renderGrid(tk) {
     // 點排切換已用餐；不加購用「改」按鈕另改
     grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
       if (e.target.closest('[data-addon]')) return; // 改按鈕不觸發切換
+      if (e.target.closest('[data-timeset]')) return;
       const next = toggleStatus(tk, tr.dataset.room);
       if (navigator.vibrate) navigator.vibrate(next === STATUS.COMPLETED ? 20 : 8);
       toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
@@ -480,6 +486,10 @@ function renderGrid(tk) {
       $('mealAdultInput').disabled = true; $('mealChildInput').disabled = true;
       $('mealSaveBtn').textContent = '確認改回不加購';
       openModal('mealEditModal');
+    }));
+    grid.querySelectorAll('[data-timeset]').forEach(td => td.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTimePicker(td.dataset.timeset);
     }));
     return;
   }
@@ -1222,6 +1232,9 @@ function bindEvents() {
   $('slotsList').addEventListener('change', e => { const c = e.target.closest('input[data-slot-check]'); if (!c) return; const i = Number(c.dataset.slotCheck); const s = getMealSlots()[i]; if (s) { s.enabled = c.checked; saveMealSlots(); renderSlotsList(); } });
   $('slotsList').addEventListener('click', e => { const b = e.target.closest('[data-slot-del]'); if (!b) return; const i = Number(b.dataset.slotDel); const s = getMealSlots()[i]; if (!s) return; state.settings.mealSlots = getMealSlots().filter((_, k) => k !== i); saveMealSlots(); renderSlotsList(); toast(`已刪除 ${s.label}`); });
 
+  // 時間選擇彈窗
+  $('timePickerCloseBtn').addEventListener('click', () => { timePickerTarget = null; closeModal('timePickerModal'); });
+
   // 備料區：比例更改即時重算並儲存
   $('prepModal').querySelectorAll('input[type="number"]').forEach(inp => {
     inp.addEventListener('change', collectPrep);
@@ -1394,6 +1407,39 @@ function openMealEdit(roomNo, mode) {
   }
   if (mode === 'revert' && $('mealTypeRow')) $('mealTypeRow').style.display = 'none';
   openModal('mealEditModal');
+}
+
+let timePickerTarget = null;
+function openTimePicker(roomNo) {
+  const room = state.rooms.find(r => r.roomNumber === roomNo);
+  if (!room) return;
+  timePickerTarget = roomNo;
+  $('timePickerTitle').textContent = `房號 ${roomNo} 用餐時間`;
+  const slots = C.enabledSlots(state.settings.mealSlots);
+  const wrap = $('timePickerOptions');
+  let html = '';
+  if (slots.length) {
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">` +
+      slots.map(s => `<button type="button" class="btn" data-time-value="${escapeHtml(s)}" style="min-height:56px">${escapeHtml(s)}</button>`).join('') + `</div>`;
+  } else {
+    html += `<p class="hint" style="text-align:center;padding:12px 0">尚未設定時段，請先到選單設定</p>`;
+  }
+  html += `<button type="button" class="btn" data-time-value="不用餐" style="min-height:52px;width:100%;background:#f1f3f5;border-color:#adb5bd;color:#495057;margin-bottom:10px">🚫 不用餐</button>`;
+  html += `<button type="button" class="btn" data-time-value="" style="min-height:52px;width:100%">清除（空白）</button>`;
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-time-value]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const room2 = state.rooms.find(x => x.roomNumber === timePickerTarget);
+      if (!room2) return;
+      room2.mealTime = btn.dataset.timeValue;
+      saveState();
+      renderGrid(todayKey());
+      closeModal('timePickerModal');
+      timePickerTarget = null;
+      toast(btn.dataset.timeValue ? `✅ ${room2.roomNumber} 時間：${btn.dataset.timeValue}` : `${room2.roomNumber} 已清除用餐時間`);
+    });
+  });
+  openModal('timePickerModal');
 }
 
 function openRoomModal(roomNo) {
