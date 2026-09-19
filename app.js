@@ -690,6 +690,7 @@ function parseOrderMatrix(matrix) {
   const childCol = findCol(/孩童/, 10);
   const infantCol = findCol(/嬰幼/, 11);
   const srcCol = findCol(/訂單來源/, 12);
+  const orderCol = findCol(/訂單編號/, -1);
 
   const num = (v) => { const n = Number(String(v || '').trim()); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; };
   const byNo = new Map();
@@ -713,6 +714,7 @@ function parseOrderMatrix(matrix) {
       const rec = {
         roomNumber: info.no, roomType: info.seg, source: src,
         adult: a, child: c, infant: inf, mealTime: '',
+        orderId: orderCol >= 0 ? String(r[orderCol] || '').trim() : '',
         breakfastType: C.isHotSource(src) ? 'hot' : 'normal'
       };
       if (byNo.has(info.no)) issues.push(`房號 ${info.no} 重複，以最後一筆為準`);
@@ -723,6 +725,32 @@ function parseOrderMatrix(matrix) {
   if (!rows.length) return null;
   rows.sort((a, b) => numericAwareSort(a.roomNumber, b.roomNumber));
   return { rows, issues, isOrder: true };
+}
+
+// 反查：同一筆訂單多間房 → Map<房號, 訂單編號>
+function collectOrderIds(matrix) {
+  if (!matrix || !matrix.length) return null;
+  const norm = matrix.map(row => (Array.isArray(row) ? row : [row]).map(c => String(c ?? '').trim()));
+  let hr = -1;
+  for (let i = 0; i < Math.min(5, norm.length); i++) {
+    if (norm[i].some(c => c.includes('訂單編號')) && norm[i].some(c => /房型房號|房間房號/.test(c))) { hr = i; break; }
+  }
+  if (hr === -1) return null;
+  const header = norm[hr];
+  const orderIdx = header.findIndex(c => c.includes('訂單編號'));
+  const roomIdx = header.findIndex(c => /房型房號|房間房號/.test(c));
+  if (orderIdx < 0 || roomIdx < 0) return null;
+  const map = new Map();
+  for (let i = hr + 1; i < norm.length; i++) {
+    const cell = (norm[i][roomIdx] || '').trim();
+    const orderId = (norm[i][orderIdx] || '').trim();
+    if (!cell || !orderId) continue;
+    cell.split(/[\/／、\n]+/).map(s => s.trim()).filter(Boolean).forEach(seg => {
+      const m = seg.match(/^(\d+)\s*([Nn])?/);
+      if (m) map.set(m[1] + (m[2] ? 'N' : ''), orderId);
+    });
+  }
+  return map.size ? map : null;
 }
 
 // ===== 早餐統計 8欄專用解析（102~512可視+規則）=====
@@ -822,34 +850,51 @@ async function parseExcelFile(file) {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: false });
   if (!wb.SheetNames.length) throw new Error('Excel 無工作表');
+  let parsed = null;
   // 優先試新訂單格式（I~M：房型房號/成人/孩童/嬰幼兒/訂單來源）
   for (const name of wb.SheetNames) {
     const m = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '', raw: false, blankrows: false });
     const po = parseOrderMatrix(m);
-    if (po && po.rows.length) return po;
+    if (po && po.rows.length) { parsed = po; break; }
   }
-  // 優先找 早餐統計
-  let targetName = wb.SheetNames.find(n => n.includes('早餐')) || wb.SheetNames[0];
-  let sheet = wb.Sheets[targetName];
-  let hiddenRows = new Set();
-  if (sheet['!rows']) {
-    sheet['!rows'].forEach((r, idx) => { if (r && r.hidden) hiddenRows.add(idx + 1); });
+  if (!parsed) {
+    // 優先找 早餐統計
+    const targetName = wb.SheetNames.find(n => n.includes('早餐')) || wb.SheetNames[0];
+    const sheet = wb.Sheets[targetName];
+    const hiddenRows = new Set();
+    if (sheet['!rows']) {
+      sheet['!rows'].forEach((r, idx) => { if (r && r.hidden) hiddenRows.add(idx + 1); });
+    }
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false, blankrows: false });
+    const parsed8 = parseBreakfastMatrix(matrix, { hiddenRows });
+    if (parsed8 && parsed8.rows.length) {
+      parsed = parsed8;
+    } else {
+      // 若非 8欄，嘗試遍歷其他 sheet
+      for (const name of wb.SheetNames) {
+        if (name === targetName) continue;
+        const s = wb.Sheets[name];
+        const hr = new Set();
+        if (s['!rows']) s['!rows'].forEach((r, idx) => { if (r && r.hidden) hr.add(idx + 1); });
+        const m = XLSX.utils.sheet_to_json(s, { header: 1, defval: '', raw: false, blankrows: false });
+        const p = parseBreakfastMatrix(m, { hiddenRows: hr });
+        if (p && p.rows.length) { parsed = p; break; }
+      }
+      if (!parsed) parsed = parseFromMatrix(matrix);
+    }
   }
-  let matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false, blankrows: false });
-  let parsed8 = parseBreakfastMatrix(matrix, { hiddenRows });
-  if (parsed8 && parsed8.rows.length) return parsed8;
-  // 若非 8欄，嘗試遍歷其他 sheet
-  for (const name of wb.SheetNames) {
-    if (name === targetName) continue;
-    const s = wb.Sheets[name];
-    const hr = new Set();
-    if (s['!rows']) s['!rows'].forEach((r, idx) => { if (r && r.hidden) hr.add(idx + 1); });
-    const m = XLSX.utils.sheet_to_json(s, { header: 1, defval: '', raw: false, blankrows: false });
-    const p = parseBreakfastMatrix(m, { hiddenRows: hr });
-    if (p && p.rows.length) return p;
+  // 訂單編號反查：以第一份含 訂單編號+房型房號 的 sheet 為準，套用到所有 rows
+  if (parsed && parsed.rows) {
+    for (const name of wb.SheetNames) {
+      const m = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '', raw: false, blankrows: false });
+      const m2 = collectOrderIds(m);
+      if (m2) {
+        parsed.rows.forEach(r => { if (!r.orderId && m2.has(r.roomNumber)) r.orderId = m2.get(r.roomNumber); });
+        break;
+      }
+    }
   }
-  // 退回舊通用解析
-  return parseFromMatrix(matrix);
+  return parsed;
 }
 
 function showImportPreview(parsed) {
@@ -914,15 +959,16 @@ function confirmImport() {
       roomNumber: r.roomNumber, roomType: r.roomType, source: r.source,
       status: '', eggMilk: '', vegan: '', adult: r.adult, child: r.child,
       infant: r.infant, mealTime: '', payStatus: '',
+      orderId: r.orderId || '',
       breakfastType: r.breakfastType
     })));
   } else if (importDraft.isBreakfast8) {
     // 8欄存法：保留完整欄位
     state.rooms = sortRooms(importDraft.rows.map(r => ({
-      roomNumber: r.roomNumber, source: r.source, status: r.status, eggMilk: r.eggMilk, vegan: r.vegan, adult: r.adult, child: r.child, mealTime: r.mealTime, payStatus: '', breakfastType: (r.adult || r.child) ? 'hot' : 'normal'
+      roomNumber: r.roomNumber, source: r.source, status: r.status, eggMilk: r.eggMilk, vegan: r.vegan, adult: r.adult, child: r.child, mealTime: r.mealTime, payStatus: '', orderId: r.orderId || '', breakfastType: (r.adult || r.child) ? 'hot' : 'normal'
     })));
   } else {
-    state.rooms = sortRooms(importDraft.rows.map(r => ({ roomNumber: r.roomNumber, breakfastType: r.breakfastType })));
+    state.rooms = sortRooms(importDraft.rows.map(r => ({ roomNumber: r.roomNumber, breakfastType: r.breakfastType, orderId: r.orderId || '' })));
   }
   saveState();
   render();
