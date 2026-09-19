@@ -287,22 +287,25 @@ function attachDirectionLock(el) {
 }
 // ===== 新訂單模式渲染（I~M 格式）=====
 // 房號與來源唯讀；大人 / 小孩(孩童+嬰幼兒合併) / 時間可改（✎ 編輯）
+const ORDER_PALETTE = ['#e64980', '#9775fa', '#4dabf7', '#38d9a9', '#ffa94d', '#fa5252', '#82c91e', '#15aabf'];
 function renderOrderGrid(tk) {
   const grid = $('roomGrid');
   grid.style.display = 'block';
   grid.style.gridTemplateColumns = 'none';
   const all = sortRooms(state.rooms);
+  const colors = C.assignGroupColors(all, ORDER_PALETTE);
   const hotList = all.filter(C.isHotRoom);
   const normalList = all.filter(r => C.isPlatformRoom(r));
   const mkRow = (r) => {
     const st = getStatus(tk, r.roomNumber);
     const done = st === STATUS.COMPLETED;
+    const color = colors[r.roomNumber] || '';
     const isAdd = C.isAddon(r);
     const isNoAdd = C.isNoAdd(r);
     const kid = orderKid(r);
     const yellowBadge = (isAdd && !r.payStatus) ? `<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">${escapeHtml(r.eggMilk)}</span>` : '';
     const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
-    return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}">
+    return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}${color ? 'border-bottom:5px solid ' + color + ';' : ''}">
       <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
       <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
       <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
@@ -389,18 +392,20 @@ function renderGrid(tk) {
     grid.style.display = 'block';
     grid.style.gridTemplateColumns = 'none';
     const all = sortRooms(state.rooms);
+    const colors = C.assignGroupColors(all, ORDER_PALETTE);
     const hotList = all.filter(r => isHotMeal(r) || isAddon(r));
     const normalList = all.filter(isNormalMeal);
     // 已/未用餐同時顯示，僅用樣式區分
     const mkRow = (r) => {
       const st = getStatus(tk, r.roomNumber);
       const done = st === STATUS.COMPLETED;
+      const color = colors[r.roomNumber] || '';
       const isAdd = isAddon(r);
       const isNoAdd = r.vegan === '不加購';
       // 匯入即加購（無付款狀態）→ 黃底「加購」；現場改加購 → 房號下方顯示 已付/待付
       const yellowBadge = (isAdd && !r.payStatus) ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : '';
       const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
-      return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}">
+      return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}${color ? 'border-bottom:5px solid ' + color + ';' : ''}">
         <td style="padding:8px 4px;font-weight:900">${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
         <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
         <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
