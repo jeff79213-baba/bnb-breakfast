@@ -27,6 +27,7 @@
 
   function isHotRoom(r) {
     if (!r) return false;
+    if (!r.source && !r.vegan && !r.eggMilk) return r.breakfastType === 'hot'; // 純 legacy 房：無來源/全素/蛋奶欄位
     if (isNoAdd(r)) return false;
     return isAddon(r) || isHotSource(r.source);
   }

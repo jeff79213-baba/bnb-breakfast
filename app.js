@@ -20,6 +20,7 @@ let importDraft = null;          // 匯入預覽暫存
 let roomModalTarget = null;      // 編輯中的房號
 
 const $ = (id) => document.getElementById(id);
+const C = window.BreakfastCore;
 
 // ===== 預設狀態 / 載入 / 儲存 =====
 // ===== 備料區預設比例（新式計算公式，均可在備料區更改）=====
@@ -48,7 +49,8 @@ function defaultState() {
     version: 1,
     settings: {
       types: JSON.parse(JSON.stringify(DEFAULT_TYPES)),
-      prep: Object.assign({}, DEFAULT_PREP)
+      prep: Object.assign({}, DEFAULT_PREP),
+      mealSlots: []
     },
     rooms: [],        // [{ roomNumber:'101', breakfastType:'hot' }]
     daily: {}         // { '2026-08-23': { '101':'completed' } } 未記錄者視為 pending
@@ -66,7 +68,8 @@ function loadState() {
       version: 1,
       settings: {
         types: Array.isArray(data.settings?.types) && data.settings.types.length ? data.settings.types : base.settings.types,
-        prep: Object.assign({}, DEFAULT_PREP, (data.settings && data.settings.prep) || {})
+        prep: Object.assign({}, DEFAULT_PREP, (data.settings && data.settings.prep) || {}),
+        mealSlots: Array.isArray(data.settings?.mealSlots) ? data.settings.mealSlots : []
       },
       rooms: Array.isArray(data.rooms) ? sanitizeRooms(data.rooms) : [],
       daily: (data.daily && typeof data.daily === 'object') ? data.daily : {}
@@ -97,11 +100,11 @@ function sanitizeRooms(rooms) {
     if ('infant' in r) {
       // 新訂單格式（I~M）：房號與來源唯讀，其餘可改（含狀態/蛋奶/全素/加購）
       const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
-      out.push({ roomNumber: no, source: r.source || '', roomType: r.roomType || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: num(r.adult), child: num(r.child), infant: num(r.infant), mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: (r.breakfastType === 'hot' || r.breakfastType === 'normal') ? r.breakfastType : 'normal' });
+      out.push({ roomNumber: no, source: r.source || '', roomType: r.roomType || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: num(r.adult), child: num(r.child), infant: num(r.infant), mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: (r.breakfastType === 'hot' || r.breakfastType === 'normal') ? r.breakfastType : 'normal', orderId: r.orderId || '' });
     } else if ('adult' in r) {
-      out.push({ roomNumber: no, source: r.source || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '', child: r.child || '', mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
+      out.push({ roomNumber: no, source: r.source || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '', child: r.child || '', mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal', orderId: r.orderId || '' });
     } else {
-      out.push({ roomNumber: no, breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal' });
+      out.push({ roomNumber: no, breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal', orderId: '' });
     }
   }
   return sortRooms(out);
@@ -163,10 +166,8 @@ function toggleStatus(dateKey, roomNumber) {
 }
 
 function isOrderMode() { return state.rooms.length && state.rooms[0] && 'infant' in state.rooms[0]; }
-// 訂單來源分流：手動/官網＝熟食，其餘＝一般（不加購/加購手動狀態優先）
-function isHotSource(src) { return /手動|官網/.test(String(src || '')); }
-function orderIsAddon(r) { return /加購/.test(r.eggMilk || ''); }
-const MEAL_TYPES = ['正常', '蛋奶', '全素']; // 加購種類三選一
+// 加購種類三選一
+const MEAL_TYPES = ['正常', '蛋奶', '全素'];
 let mealTypeChoice = '正常'; // 正常 | 蛋奶 | 全素
 function updateMealTypeButtons() {
   const map = { '正常': $('mealTypeNormalBtn'), '蛋奶': $('mealTypeEggBtn'), '全素': $('mealTypeVeganBtn') };
@@ -180,47 +181,10 @@ function updateMealTypeButtons() {
   });
 }
 function mealTypeValue() { return mealTypeChoice === '正常' ? '加購' : mealTypeChoice + '加購'; }
-function orderIsNoAdd(r) { return r.vegan === '不加購'; }
-function orderInHot(r) {
-  if (orderIsNoAdd(r)) return false;
-  if (orderIsAddon(r)) return true;
-  return r.breakfastType === 'hot';
-}
 function orderKid(r) { return (Number(r.child) || 0) + (Number(r.infant) || 0); }
-function orderTotal(r) { return (Number(r.adult) || 0) + orderKid(r); }
 
 function computeStats(dateKey) {
-  if (isOrderMode()) {
-    let hot = 0, normal = 0, addon = 0, completed = 0;
-    for (const r of state.rooms) {
-      if (orderIsAddon(r)) addon++;
-      else if (orderInHot(r)) hot++;
-      else normal++;
-      if (getStatus(dateKey, r.roomNumber) === STATUS.COMPLETED) completed++;
-    }
-    const total = state.rooms.length;
-    return { hot, normal, addon, completed, pending: total - completed, total };
-  }
-  if (isBreakfast8Mode()) {
-    let hot = 0, normal = 0, addon = 0, completed = 0;
-    for (const r of state.rooms) {
-      if (isAddon(r)) addon++;
-      else if (isHotMeal(r)) hot++;
-      else if (isNormalMeal(r)) normal++;
-      else normal++; // 續住不加購等歸一般
-      if (getStatus(dateKey, r.roomNumber) === STATUS.COMPLETED) completed++;
-    }
-    const total = state.rooms.length;
-    return { hot, normal, addon, completed, pending: total - completed, total };
-  }
-  let hot = 0, normal = 0, completed = 0;
-  for (const r of state.rooms) {
-    if (r.breakfastType === 'hot') hot++;
-    else normal++;
-    if (getStatus(dateKey, r.roomNumber) === STATUS.COMPLETED) completed++;
-  }
-  const total = state.rooms.length;
-  return { hot, normal, completed, pending: total - completed, total };
+  return C.computeStats(state.rooms, r => getStatus(dateKey, r.roomNumber));
 }
 
 function filterRooms(dateKey, filter) {
@@ -256,10 +220,7 @@ function render() {
 
   // 熟食警示橫幅（簡約線條）
   const banner = $('hotAlertBanner');
-  let hotPending = 0;
-  if (isBreakfast8Mode()) hotPending = state.rooms.filter(r => isHotMeal(r) && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
-  else if (isOrderMode()) hotPending = state.rooms.filter(r => orderInHot(r) && !orderIsAddon(r) && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
-  else hotPending = state.rooms.filter(r => r.breakfastType === 'hot' && getStatus(tk, r.roomNumber) === STATUS.PENDING).length;
+  const hotPending = C.computeHotPending(state.rooms, r => getStatus(tk, r.roomNumber));
   banner.classList.remove('hidden');
   if (hotPending > 0) {
     banner.textContent = `尚有 ${hotPending} 間熟食未用餐`;
@@ -294,9 +255,9 @@ function updatePayButtons() {
     paid.style.background = '#fff'; paid.style.borderColor = '#dee2e6'; paid.style.color = '#212529';
   }
 }
-function isAddon(r) { return r.eggMilk === '加購'; }
-function isHotMeal(r) { return !isAddon(r) && !!(r.adult || r.child) && r.vegan !== '不加購'; }
-function isNormalMeal(r) { return r.vegan === '不加購'; }
+function isAddon(r) { return C.isAddon(r); }
+function isHotMeal(r) { return C.isHotRoom(r); }
+function isNormalMeal(r) { return C.isPlatformRoom(r); }
 // 兩欄定向滑動：真正單軸鎖定，避免斜滑（手動接管 touch）
 // touch-action:none + preventDefault，手動依主軸只捲單向
 function attachDirectionLock(el) {
@@ -331,13 +292,13 @@ function renderOrderGrid(tk) {
   grid.style.display = 'block';
   grid.style.gridTemplateColumns = 'none';
   const all = sortRooms(state.rooms);
-  const hotList = all.filter(orderInHot);
-  const normalList = all.filter(r => !orderInHot(r));
+  const hotList = all.filter(C.isHotRoom);
+  const normalList = all.filter(r => C.isPlatformRoom(r));
   const mkRow = (r) => {
     const st = getStatus(tk, r.roomNumber);
     const done = st === STATUS.COMPLETED;
-    const isAdd = orderIsAddon(r);
-    const isNoAdd = orderIsNoAdd(r);
+    const isAdd = C.isAddon(r);
+    const isNoAdd = C.isNoAdd(r);
     const kid = orderKid(r);
     const yellowBadge = (isAdd && !r.payStatus) ? `<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">${escapeHtml(r.eggMilk)}</span>` : '';
     const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
@@ -354,7 +315,7 @@ function renderOrderGrid(tk) {
     </tr>`;
   };
   const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-  const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無一般</td></tr>';
+  const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
   // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
   const savedScrolls = {};
   grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
@@ -367,7 +328,7 @@ function renderOrderGrid(tk) {
         </div>
       </div>
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
-        <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">一般</div>
+        <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
         <div class="pane-scroll" data-pane="normal">
           <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
         </div>
@@ -452,7 +413,7 @@ function renderGrid(tk) {
       </tr>`;
     };
     const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-    const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無一般</td></tr>';
+    const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
     // 上方四按鈕同時顯示，不做單欄篩選 - 僅顯示數字
     // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
     const savedScrolls = {};
@@ -466,7 +427,7 @@ function renderGrid(tk) {
           </div>
         </div>
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
-          <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">一般</div>
+          <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
           <div class="pane-scroll" data-pane="normal">
             <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
           </div>
@@ -752,7 +713,7 @@ function parseOrderMatrix(matrix) {
       const rec = {
         roomNumber: info.no, roomType: info.seg, source: src,
         adult: a, child: c, infant: inf, mealTime: '',
-        breakfastType: isHotSource(src) ? 'hot' : 'normal'
+        breakfastType: C.isHotSource(src) ? 'hot' : 'normal'
       };
       if (byNo.has(info.no)) issues.push(`房號 ${info.no} 重複，以最後一筆為準`);
       byNo.set(info.no, rec);
