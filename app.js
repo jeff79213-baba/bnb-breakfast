@@ -420,8 +420,8 @@ function openOrderEdit(roomNo) {
   $('orderInfantInput').value = room.infant ?? '';
   $('orderTimeInput').value = room.mealTime || '';
   $('orderStatusInput').value = room.status || '';
-  $('orderEggMilkInput').value = ['加購', '蛋奶加購', '全素加購'].includes(room.eggMilk) ? room.eggMilk : '';
-  $('orderVeganInput').value = room.vegan === '不加購' ? '不加購' : '';
+  $('orderEggMilkInput').value = room.eggMilk === '全素加購' ? '全素加購' : (['加購', '蛋奶加購'].includes(room.eggMilk) ? '蛋奶加購' : '');
+  $('orderVeganInput').value = ['加購', '不加購'].includes(room.vegan) ? room.vegan : '';
   openModal('orderEditModal');
 }
 
@@ -1410,8 +1410,8 @@ function bindEvents() {
     room.mealTime = $('orderTimeInput').value.trim();
     room.status = $('orderStatusInput').value.trim();
     const em = $('orderEggMilkInput').value;
-    room.eggMilk = ['加購', '蛋奶加購', '全素加購'].includes(em) ? em : '';
-    room.vegan = $('orderVeganInput').value === '不加購' ? '不加購' : '';
+    room.eggMilk = ['蛋奶加購', '全素加購'].includes(em) ? em : '';
+    room.vegan = ['加購', '不加購'].includes($('orderVeganInput').value) ? $('orderVeganInput').value : '';
     if (room.eggMilk && room.vegan === '不加購') room.vegan = '';
     const moved = newNo !== orderEditTarget;
     const oldNo = orderEditTarget;
