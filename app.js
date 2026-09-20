@@ -340,22 +340,36 @@ function renderOrderGrid(tk) {
       <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
     </tr>`;
   };
-  const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-  const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
+  // 蛇形連續排列：熟食優先→平台接續，平分左右兩欄
+  const ordered = hotList.concat(normalList);
+  const split = Math.ceil(ordered.length / 2);
+  const hotSet = new Set(hotList.map(r => r.roomNumber));
+  const typebar = (t) => t === 'hot'
+    ? '<tr><td colspan=7 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">熟食</div></td></tr>'
+    : '<tr><td colspan=7 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">平台</div></td></tr>';
+  const colRows = (rooms) => {
+    let html = '', cur = '';
+    rooms.forEach(r => {
+      const t = hotSet.has(r.roomNumber) ? 'hot' : 'normal';
+      if (t !== cur) { html += typebar(t); cur = t; }
+      html += mkRow(r);
+    });
+    return html || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無訂單</td></tr>';
+  };
+  const col1Rows = colRows(ordered.slice(0, split));
+  const col2Rows = colRows(ordered.slice(split));
   const savedScrolls = {};
   grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
   grid.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:100%">
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
-        <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
-        <div class="pane-scroll" data-pane="hot">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
+        <div class="pane-scroll" data-pane="col1">
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${col1Rows}</tbody></table>
         </div>
       </div>
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
-        <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
-        <div class="pane-scroll" data-pane="normal">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
+        <div class="pane-scroll" data-pane="col2">
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${col2Rows}</tbody></table>
         </div>
       </div>
     </div>`;
@@ -444,22 +458,36 @@ function renderGrid(tk) {
         <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
       </tr>`;
     };
-    const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-    const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
+    // 蛇形連續排列：熟食優先→平台接續，平分左右兩欄
+    const ordered = hotList.concat(normalList);
+    const split = Math.ceil(ordered.length / 2);
+    const hotSet = new Set(hotList.map(r => r.roomNumber));
+    const typebar = (t) => t === 'hot'
+      ? '<tr><td colspan=7 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">熟食</div></td></tr>'
+      : '<tr><td colspan=7 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">平台</div></td></tr>';
+    const colRows = (rooms) => {
+      let html = '', cur = '';
+      rooms.forEach(r => {
+        const t = hotSet.has(r.roomNumber) ? 'hot' : 'normal';
+        if (t !== cur) { html += typebar(t); cur = t; }
+        html += mkRow(r);
+      });
+      return html || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無訂單</td></tr>';
+    };
+    const col1Rows = colRows(ordered.slice(0, split));
+    const col2Rows = colRows(ordered.slice(split));
     const savedScrolls = {};
     grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
     grid.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:100%">
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
-          <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
-          <div class="pane-scroll" data-pane="hot">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
+          <div class="pane-scroll" data-pane="col1">
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${col1Rows}</tbody></table>
           </div>
         </div>
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
-          <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
-          <div class="pane-scroll" data-pane="normal">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
+          <div class="pane-scroll" data-pane="col2">
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${col2Rows}</tbody></table>
           </div>
         </div>
       </div>`;

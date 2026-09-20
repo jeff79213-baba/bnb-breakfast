@@ -413,9 +413,8 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
   position: sticky;
   top: 0;
   z-index: 2;
+  background: #f1f3f5;
 }
-.pane-scroll[data-pane="hot"] thead th { background: #fff1e7; }
-.pane-scroll[data-pane="normal"] thead th { background: #ebfbee; }
 
 /* 平板／桌面 */
 @media (min-width: 768px) {
