@@ -386,12 +386,27 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
   display: block;
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 62vh;
+  /* 手機：由 JS 量測後寫入 --pane-max-h；未量測前退回 62vh */
+  max-height: var(--pane-max-h, 62vh);
   min-height: 160px;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: none;
   scrollbar-width: thin;
+}
+/* 兩欄卡片容器：flexbox 讓 pane-scroll 填滿剩餘高度 */
+#roomGrid > div > div {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+/* 平板以上：pane-scroll 填滿父容器（由 flex 控制），不受 max-height 限制 */
+@media (min-width: 768px) {
+  .pane-scroll {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
 }
 /* 表頭固定：上下滑動時 房號/來源/狀態 等不跟著捲 */
 .pane-scroll thead th {

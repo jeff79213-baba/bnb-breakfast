@@ -285,6 +285,31 @@ function attachDirectionLock(el) {
   el.addEventListener('touchend', () => { locked = null; }, { passive: true });
   el.addEventListener('touchcancel', () => { locked = null; }, { passive: true });
 }
+// 兩欄表格高度：量測上方統計區（標題／五宮格／進度條／警示橫幅）後，
+// 把畫面剩餘高度寫進 CSS 變數 --pane-max-h，讓兩欄往下長到畫面底部（吃掉底部空白）。
+// 用實際量測而非固定 vh，直立手機統計區折三列、平板一列都能正確填滿。
+function applyPaneHeight() {
+  const grid = $('roomGrid');
+  if (!grid) return;
+  const pane = grid.querySelector('.pane-scroll');
+  if (!pane) return;
+  const top = pane.getBoundingClientRect().top + window.scrollY;
+  const avail = window.innerHeight - top - 36;
+  const h = Math.max(240, Math.round(avail));
+  document.documentElement.style.setProperty('--pane-max-h', h + 'px');
+  const gridContainer = grid.querySelector(':scope > div');
+  if (gridContainer && gridContainer.style.gridTemplateColumns) {
+    gridContainer.style.height = h + 'px';
+  }
+}
+let paneHeightBound = false;
+function bindPaneHeight() {
+  if (paneHeightBound) return;
+  paneHeightBound = true;
+  window.addEventListener('resize', applyPaneHeight);
+  window.addEventListener('orientationchange', () => setTimeout(applyPaneHeight, 250));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', applyPaneHeight);
+}
 // ===== 新訂單模式渲染（I~M 格式）=====
 // 房號與來源唯讀；大人 / 小孩(孩童+嬰幼兒合併) / 時間可改（✎ 編輯）
 const ORDER_PALETTE = ['#e64980', '#9775fa', '#4dabf7', '#38d9a9', '#ffa94d', '#fa5252', '#82c91e', '#15aabf'];
@@ -319,6 +344,15 @@ function renderOrderGrid(tk) {
   };
   const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
   const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
+  // overflow: shorter column shows extra rooms from the other type
+  let hotOverflow = "", normalOverflow = "";
+  if (hotList.length > normalList.length && normalList.length > 0) {
+    const extra = hotList.slice(normalList.length);
+    hotOverflow = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充熟食 ──</td></tr>' + extra.map(mkRow).join("");
+  } else if (normalList.length > hotList.length && hotList.length > 0) {
+    const extra = normalList.slice(hotList.length);
+    normalOverflow = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充平台 ──</td></tr>' + extra.map(mkRow).join("");
+  }
   // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
   const savedScrolls = {};
   grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
@@ -327,13 +361,13 @@ function renderOrderGrid(tk) {
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
         <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
         <div class="pane-scroll" data-pane="hot">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow}</tbody></table>
         </div>
       </div>
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
         <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
         <div class="pane-scroll" data-pane="normal">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow}</tbody></table>
         </div>
       </div>
     </div>`;
@@ -342,6 +376,8 @@ function renderOrderGrid(tk) {
     if (typeof saved === 'number') el.scrollTop = saved;
   });
   grid.querySelectorAll('.pane-scroll').forEach(attachDirectionLock);
+  bindPaneHeight();
+  applyPaneHeight();
   grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
     if (e.target.closest('[data-orderedit]')) return;
     if (e.target.closest('[data-orderaddon]')) return;
@@ -424,6 +460,15 @@ function renderGrid(tk) {
     };
     const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
     const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
+    // overflow: shorter column shows extra rooms from the other type
+    let hotOverflow8 = "", normalOverflow8 = "";
+    if (hotList.length > normalList.length && normalList.length > 0) {
+      const extra = hotList.slice(normalList.length);
+      hotOverflow8 = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充熟食 ──</td></tr>' + extra.map(mkRow).join("");
+    } else if (normalList.length > hotList.length && hotList.length > 0) {
+      const extra = normalList.slice(hotList.length);
+      normalOverflow8 = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充平台 ──</td></tr>' + extra.map(mkRow).join("");
+    }
     // 上方四按鈕同時顯示，不做單欄篩選 - 僅顯示數字
     // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
     const savedScrolls = {};
@@ -433,13 +478,13 @@ function renderGrid(tk) {
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
           <div class="pane-scroll" data-pane="hot">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow8}</tbody></table>
           </div>
         </div>
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
           <div class="pane-scroll" data-pane="normal">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow8}</tbody></table>
           </div>
         </div>
       </div>`;
@@ -448,6 +493,8 @@ function renderGrid(tk) {
       if (typeof saved === 'number') el.scrollTop = saved;
     });
     grid.querySelectorAll('.pane-scroll').forEach(attachDirectionLock);
+    bindPaneHeight();
+    applyPaneHeight();
     // 點排切換已用餐；不加購用「改」按鈕另改
     grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
       if (e.target.closest('[data-addon]')) return; // 改按鈕不觸發切換
