@@ -348,10 +348,10 @@ function renderOrderGrid(tk) {
   let hotOverflow = "", normalOverflow = "";
   if (hotList.length > normalList.length && normalList.length > 0) {
     const extra = hotList.slice(normalList.length);
-    hotOverflow = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充熟食 ──</td></tr>' + extra.map(mkRow).join("");
+    hotOverflow = '<tr><td colspan=9 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + extra.map(mkRow).join("");
   } else if (normalList.length > hotList.length && hotList.length > 0) {
     const extra = normalList.slice(hotList.length);
-    normalOverflow = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充平台 ──</td></tr>' + extra.map(mkRow).join("");
+    normalOverflow = '<tr><td colspan=9 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + extra.map(mkRow).join("");
   }
   // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
   const savedScrolls = {};
@@ -464,10 +464,10 @@ function renderGrid(tk) {
     let hotOverflow8 = "", normalOverflow8 = "";
     if (hotList.length > normalList.length && normalList.length > 0) {
       const extra = hotList.slice(normalList.length);
-      hotOverflow8 = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充熟食 ──</td></tr>' + extra.map(mkRow).join("");
+      hotOverflow8 = '<tr><td colspan=9 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + extra.map(mkRow).join("");
     } else if (normalList.length > hotList.length && hotList.length > 0) {
       const extra = normalList.slice(hotList.length);
-      normalOverflow8 = '<tr><td colspan=9 style="text-align:center;padding:6px 4px;font-size:11px;color:#868e96;border-top:1px dashed #dee2e6">── 補充平台 ──</td></tr>' + extra.map(mkRow).join("");
+      normalOverflow8 = '<tr><td colspan=9 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + extra.map(mkRow).join("");
     }
     // 上方四按鈕同時顯示，不做單欄篩選 - 僅顯示數字
     // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
