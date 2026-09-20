@@ -22,7 +22,9 @@
   }
 
   function isAddon(r) {
-    return !!(r && /加購/.test(String(r.eggMilk || '')));
+    if (!r) return false;
+    if (/加購/.test(String(r.eggMilk || ''))) return true;
+    return r.vegan === '加購';
   }
 
   function isHotRoom(r) {

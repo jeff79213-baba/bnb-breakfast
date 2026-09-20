@@ -18,9 +18,11 @@ test('isHotSource: 手動/官網/官網訂單為熟食來源，其餘不是', ()
   assert.strictEqual(C.isHotSource(undefined), false);
 });
 
-test('isAddon: eggMilk 含加購即為真', () => {
+test('isAddon: eggMilk 含加購，或 vegan === 加購', () => {
   assert.strictEqual(C.isAddon(addonRoom), true);
   assert.strictEqual(C.isAddon({ eggMilk: '蛋奶加購' }), true);
+  assert.strictEqual(C.isAddon({ vegan: '加購' }), true);
+  assert.strictEqual(C.isAddon({ vegan: '不加購' }), false);
   assert.strictEqual(C.isAddon(platformRoom), false);
   assert.strictEqual(C.isAddon(undefined), false);
 });
@@ -37,6 +39,15 @@ test('isHotRoom / isPlatformRoom: 真理表', () => {
   assert.strictEqual(C.isHotRoom(noAddRoom), false);     // 官網但不加購 → 平台
   assert.strictEqual(C.isPlatformRoom(platformRoom), true);
   assert.strictEqual(C.isPlatformRoom(hotSrcRoom), false);
+});
+
+test('平台房改加購（vegan=加購）→ 排進熟食並計入未用餐', () => {
+  const edited = { ...platformRoom, vegan: '加購', eggMilk: '' };
+  assert.strictEqual(C.isHotRoom(edited), true);
+  assert.strictEqual(C.isPlatformRoom(edited), false);
+  assert.strictEqual(C.computeHotPending([edited], () => 'pending'), 1);
+  assert.strictEqual(C.computeStats([edited], () => 'pending').hot, 1);
+  assert.strictEqual(C.computeStats([edited], () => 'pending').addon, 1);
 });
 
 test('isNoMeal: mealTime === 不用餐', () => {

@@ -328,7 +328,7 @@ function renderOrderGrid(tk) {
     const isAdd = C.isAddon(r);
     const isNoAdd = C.isNoAdd(r);
     const kid = orderKid(r);
-    const yellowBadge = (isAdd && !r.payStatus) ? `<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">${escapeHtml(r.eggMilk)}</span>` : '';
+    const yellowBadge = (isAdd && !r.payStatus) ? `<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">${escapeHtml(r.eggMilk || (r.vegan === '加購' ? '加購' : ''))}</span>` : '';
     const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
     return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}${color ? ';border-bottom:5px solid ' + color + ';' : ''}">
       <td style="padding:8px 4px;font-weight:900">${color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.12)"></span>` : ''}${escapeHtml(r.roomNumber)}${r.guestName ? `<span title="${escapeHtml(r.guestName)}" style="font-size:11px;color:#868e96;margin-left:4px">(${escapeHtml(r.guestName.length > 5 ? r.guestName.slice(0,5) + '...' : r.guestName)})</span>` : ''}${yellowBadge}${payLine}</td>
