@@ -340,25 +340,8 @@ function renderOrderGrid(tk) {
       <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
     </tr>`;
   };
-  // overflow: split lists so no duplication
-  let hotBaseList = hotList, hotExtra = [];
-  let normalBaseList = normalList, normalExtra = [];
-  if (hotList.length > normalList.length && normalList.length > 0) {
-    hotBaseList = hotList.slice(0, normalList.length);
-    hotExtra = hotList.slice(normalList.length);
-  } else if (normalList.length > hotList.length && hotList.length > 0) {
-    normalBaseList = normalList.slice(0, hotList.length);
-    normalExtra = normalList.slice(hotList.length);
-  }
-  const hotRows = hotBaseList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-  const normalRows = normalBaseList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
-  let hotOverflow = "", normalOverflow = "";
-  if (hotExtra.length) {
-    hotOverflow = '<tr><td colspan=7 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + hotExtra.map(mkRow).join("");
-  }
-  if (normalExtra.length) {
-    normalOverflow = '<tr><td colspan=7 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + normalExtra.map(mkRow).join("");
-  }
+  const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
+  const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
   const savedScrolls = {};
   grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
   grid.innerHTML = `
@@ -366,13 +349,13 @@ function renderOrderGrid(tk) {
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
         <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
         <div class="pane-scroll" data-pane="hot">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow}</tbody></table>
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
         </div>
       </div>
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
         <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
         <div class="pane-scroll" data-pane="normal">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow}</tbody></table>
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
         </div>
       </div>
     </div>`;
@@ -461,25 +444,8 @@ function renderGrid(tk) {
         <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
       </tr>`;
     };
-    // overflow: split lists so no duplication
-    let hotBaseList8 = hotList, hotExtra8 = [];
-    let normalBaseList8 = normalList, normalExtra8 = [];
-    if (hotList.length > normalList.length && normalList.length > 0) {
-      hotBaseList8 = hotList.slice(0, normalList.length);
-      hotExtra8 = hotList.slice(normalList.length);
-    } else if (normalList.length > hotList.length && hotList.length > 0) {
-      normalBaseList8 = normalList.slice(0, hotList.length);
-      normalExtra8 = normalList.slice(hotList.length);
-    }
-    const hotRows = hotBaseList8.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-    const normalRows = normalBaseList8.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
-    let hotOverflow8 = "", normalOverflow8 = "";
-    if (hotExtra8.length) {
-      hotOverflow8 = '<tr><td colspan=7 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + hotExtra8.map(mkRow).join("");
-    }
-    if (normalExtra8.length) {
-      normalOverflow8 = '<tr><td colspan=7 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + normalExtra8.map(mkRow).join("");
-    }
+    const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
+    const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
     const savedScrolls = {};
     grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
     grid.innerHTML = `
@@ -487,13 +453,13 @@ function renderGrid(tk) {
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
           <div class="pane-scroll" data-pane="hot">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow8}</tbody></table>
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}</tbody></table>
           </div>
         </div>
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
           <div class="pane-scroll" data-pane="normal">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow8}</tbody></table>
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}</tbody></table>
           </div>
         </div>
       </div>`;
