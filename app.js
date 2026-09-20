@@ -100,7 +100,7 @@ function sanitizeRooms(rooms) {
     if ('infant' in r) {
       // 新訂單格式（I~M）：房號與來源唯讀，其餘可改（含狀態/蛋奶/全素/加購）
       const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
-      out.push({ roomNumber: no, source: r.source || '', roomType: r.roomType || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: num(r.adult), child: num(r.child), infant: num(r.infant), mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: (r.breakfastType === 'hot' || r.breakfastType === 'normal') ? r.breakfastType : 'normal', orderId: r.orderId || '' });
+      out.push({ roomNumber: no, source: r.source || '', roomType: r.roomType || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: num(r.adult), child: num(r.child), infant: num(r.infant), mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: (r.breakfastType === 'hot' || r.breakfastType === 'normal') ? r.breakfastType : 'normal', orderId: r.orderId || '', guestName: r.guestName || '' });
     } else if ('adult' in r) {
       out.push({ roomNumber: no, source: r.source || '', status: r.status || '', eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '', child: r.child || '', mealTime: r.mealTime || '', payStatus: (r.payStatus === '已付' || r.payStatus === '待付') ? r.payStatus : '', breakfastType: validType(r.breakfastType) ? r.breakfastType : 'normal', orderId: r.orderId || '' });
     } else {
@@ -331,29 +331,34 @@ function renderOrderGrid(tk) {
     const yellowBadge = (isAdd && !r.payStatus) ? `<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">${escapeHtml(r.eggMilk)}</span>` : '';
     const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
     return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}${color ? ';border-bottom:5px solid ' + color + ';' : ''}">
-      <td style="padding:8px 4px;font-weight:900">${color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.12)"></span>` : ''}${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
+      <td style="padding:8px 4px;font-weight:900">${color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.12)"></span>` : ''}${escapeHtml(r.roomNumber)}${r.guestName ? `<span title="${escapeHtml(r.guestName)}" style="font-size:11px;color:#868e96;margin-left:4px">(${escapeHtml(r.guestName.length > 5 ? r.guestName.slice(0,5) + '...' : r.guestName)})</span>` : ''}${yellowBadge}${payLine}</td>
       <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
-      <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
-      <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}${isAdd ? `<button data-orderrevert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
-      <td style="font-size:12px">${escapeHtml(r.vegan || '')}${isNoAdd ? `<button data-orderaddon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
+      <td style="font-size:11px">${[r.status, r.eggMilk, r.vegan].filter(Boolean).map(escapeHtml).join(' ')}${isAdd ? `<button data-orderrevert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${isNoAdd ? `<button data-orderaddon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}</td>
       <td style="text-align:center;font-weight:700">${escapeHtml(r.adult ?? '')}</td>
       <td style="text-align:center">${escapeHtml(kid || '')}</td>
       <td style="font-size:12px;color:${r.mealTime === '不用餐' ? '#868e96;font-style:italic' : 'inherit'}" data-timeset="${escapeHtml(r.roomNumber)}">${escapeHtml(r.mealTime || '')}${r.mealTime ? '' : '<span class="hint" style="color:#adb5bd">＋</span>'}<button data-orderedit="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button></td>
       <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
     </tr>`;
   };
-  const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-  const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
-  // overflow: shorter column shows extra rooms from the other type
-  let hotOverflow = "", normalOverflow = "";
+  // overflow: split lists so no duplication
+  let hotBaseList = hotList, hotExtra = [];
+  let normalBaseList = normalList, normalExtra = [];
   if (hotList.length > normalList.length && normalList.length > 0) {
-    const extra = hotList.slice(normalList.length);
-    hotOverflow = '<tr><td colspan=9 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + extra.map(mkRow).join("");
+    hotBaseList = hotList.slice(0, normalList.length);
+    hotExtra = hotList.slice(normalList.length);
   } else if (normalList.length > hotList.length && hotList.length > 0) {
-    const extra = normalList.slice(hotList.length);
-    normalOverflow = '<tr><td colspan=9 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + extra.map(mkRow).join("");
+    normalBaseList = normalList.slice(0, hotList.length);
+    normalExtra = normalList.slice(hotList.length);
   }
-  // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
+  const hotRows = hotBaseList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
+  const normalRows = normalBaseList.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
+  let hotOverflow = "", normalOverflow = "";
+  if (hotExtra.length) {
+    hotOverflow = '<tr><td colspan=7 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + hotExtra.map(mkRow).join("");
+  }
+  if (normalExtra.length) {
+    normalOverflow = '<tr><td colspan=7 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + normalExtra.map(mkRow).join("");
+  }
   const savedScrolls = {};
   grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
   grid.innerHTML = `
@@ -361,13 +366,13 @@ function renderOrderGrid(tk) {
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
         <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
         <div class="pane-scroll" data-pane="hot">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow}</tbody></table>
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow}</tbody></table>
         </div>
       </div>
       <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
         <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
         <div class="pane-scroll" data-pane="normal">
-          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow}</tbody></table>
+          <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow}</tbody></table>
         </div>
       </div>
     </div>`;
@@ -447,30 +452,34 @@ function renderGrid(tk) {
       const yellowBadge = (isAdd && !r.payStatus) ? '<span style="background:#fcc419;color:#664d03;font-size:10px;padding:1px 4px;border-radius:4px;margin-left:4px">加購</span>' : '';
       const payLine = (isAdd && r.payStatus) ? `<div style="font-size:12px;font-weight:800;margin-top:2px;color:${r.payStatus === '已付' ? '#2f9e44' : '#e8590c'}">${r.payStatus}</div>` : '';
       return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}${color ? ';border-bottom:5px solid ' + color + ';' : ''}">
-        <td style="padding:8px 4px;font-weight:900">${color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.12)"></span>` : ''}${escapeHtml(r.roomNumber)}${yellowBadge}${payLine}</td>
+        <td style="padding:8px 4px;font-weight:900">${color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.12)"></span>` : ''}${escapeHtml(r.roomNumber)}${r.guestName ? `<span title="${escapeHtml(r.guestName)}" style="font-size:11px;color:#868e96;margin-left:4px">(${escapeHtml(r.guestName.length > 5 ? r.guestName.slice(0,5) + '...' : r.guestName)})</span>` : ''}${yellowBadge}${payLine}</td>
         <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
-        <td style="font-size:11px">${r.status ? `<span style="background:#ffe3e3;color:#c92a2a;padding:1px 5px;border-radius:999px">${escapeHtml(r.status)}</span>` : ''}</td>
-        <td style="font-size:12px">${escapeHtml(r.eggMilk || '')}${isAdd ? `<button data-revert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
-        <td style="font-size:12px">${escapeHtml(r.vegan || '')}${isNoAdd ? `<button data-addon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:11px;padding:1px 6px">改</button>` : ''}</td>
+        <td style="font-size:11px">${[r.status, r.eggMilk, r.vegan].filter(Boolean).map(escapeHtml).join(' ')}${isAdd ? `<button data-revert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${isNoAdd ? `<button data-addon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}</td>
         <td style="text-align:center;font-weight:700">${escapeHtml(r.adult || '')}</td>
         <td style="text-align:center">${escapeHtml(r.child || '')}</td>
         <td style="font-size:12px;color:${r.mealTime === '不用餐' ? '#868e96;font-style:italic' : 'inherit'}" data-timeset="${escapeHtml(r.roomNumber)}">${escapeHtml(r.mealTime || '')}${r.mealTime ? '' : '<span class="hint" style="color:#adb5bd">＋</span>'}</td>
         <td style="text-align:center">${done ? '<span class="line-check" style="border-color:#1971c2"></span>' : '<span class="line-pending"></span>'}</td>
       </tr>`;
     };
-    const hotRows = hotList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
-    const normalRows = normalList.map(mkRow).join('') || '<tr><td colspan=9 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
-    // overflow: shorter column shows extra rooms from the other type
-    let hotOverflow8 = "", normalOverflow8 = "";
+    // overflow: split lists so no duplication
+    let hotBaseList8 = hotList, hotExtra8 = [];
+    let normalBaseList8 = normalList, normalExtra8 = [];
     if (hotList.length > normalList.length && normalList.length > 0) {
-      const extra = hotList.slice(normalList.length);
-      hotOverflow8 = '<tr><td colspan=9 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + extra.map(mkRow).join("");
+      hotBaseList8 = hotList.slice(0, normalList.length);
+      hotExtra8 = hotList.slice(normalList.length);
     } else if (normalList.length > hotList.length && hotList.length > 0) {
-      const extra = normalList.slice(hotList.length);
-      normalOverflow8 = '<tr><td colspan=9 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + extra.map(mkRow).join("");
+      normalBaseList8 = normalList.slice(0, hotList.length);
+      normalExtra8 = normalList.slice(hotList.length);
     }
-    // 上方四按鈕同時顯示，不做單欄篩選 - 僅顯示數字
-    // 記住兩欄捲動位置，重繪後還原，避免點選後跳回頂部
+    const hotRows = hotBaseList8.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無熟食</td></tr>';
+    const normalRows = normalBaseList8.map(mkRow).join('') || '<tr><td colspan=7 style="text-align:center;padding:20px;color:#868e96">無平台</td></tr>';
+    let hotOverflow8 = "", normalOverflow8 = "";
+    if (hotExtra8.length) {
+      hotOverflow8 = '<tr><td colspan=7 style="padding:0"><div style="background:#e8590c;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充熟食</div></td></tr>' + hotExtra8.map(mkRow).join("");
+    }
+    if (normalExtra8.length) {
+      normalOverflow8 = '<tr><td colspan=7 style="padding:0"><div style="background:#2f9e44;color:#fff;text-align:center;padding:4px 0;font-weight:900;font-size:13px;letter-spacing:1px">補充平台</div></td></tr>' + normalExtra8.map(mkRow).join("");
+    }
     const savedScrolls = {};
     grid.querySelectorAll('.pane-scroll').forEach(el => { savedScrolls[el.dataset.pane] = el.scrollTop; });
     grid.innerHTML = `
@@ -478,13 +487,13 @@ function renderGrid(tk) {
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#e8590c;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">熟食</div>
           <div class="pane-scroll" data-pane="hot">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow8}</tbody></table>
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fff1e7;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${hotRows}${normalOverflow8}</tbody></table>
           </div>
         </div>
         <div style="background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.07)">
           <div style="background:#2f9e44;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:18px;letter-spacing:2px">平台</div>
           <div class="pane-scroll" data-pane="normal">
-            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow8}</tbody></table>
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#ebfbee;font-size:11px"><th>房號</th><th>來源</th><th>備註</th><th>大人</th><th>小孩</th><th>時間</th><th></th></tr></thead><tbody>${normalRows}${hotOverflow8}</tbody></table>
           </div>
         </div>
       </div>`;
@@ -871,6 +880,7 @@ function parseOrderMatrix(matrix) {
   const infantCol = findCol(/嬰幼/, 11);
   const srcCol = findCol(/訂單來源/, 12);
   const orderCol = findCol(/訂單編號/, -1);
+  const guestCol = findCol(/顧客|Guest|姓名|住客/, 4);
 
   const num = (v) => { const n = Number(String(v || '').trim()); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; };
   const byNo = new Map();
@@ -895,6 +905,7 @@ function parseOrderMatrix(matrix) {
         roomNumber: info.no, roomType: info.seg, source: src,
         adult: a, child: c, infant: inf, mealTime: '',
         orderId: orderCol >= 0 ? String(r[orderCol] || '').trim() : '',
+        guestName: guestCol >= 0 ? String(r[guestCol] || '').trim() : '',
         breakfastType: C.isHotSource(src) ? 'hot' : 'normal'
       };
       if (byNo.has(info.no)) issues.push(`房號 ${info.no} 重複，以最後一筆為準`);
@@ -1136,7 +1147,7 @@ function confirmImport() {
   if (importDraft.isOrder) {
     // 新訂單存法：房號與來源唯讀，其餘可改（含狀態/蛋奶/全素）
     state.rooms = sortRooms(importDraft.rows.map(r => ({
-      roomNumber: r.roomNumber, roomType: r.roomType, source: r.source,
+      roomNumber: r.roomNumber, roomType: r.roomType, source: r.source, guestName: r.guestName || '',
       status: '', eggMilk: '', vegan: '', adult: r.adult, child: r.child,
       infant: r.infant, mealTime: '', payStatus: '',
       orderId: r.orderId || '',
