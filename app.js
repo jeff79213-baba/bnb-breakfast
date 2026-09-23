@@ -50,7 +50,8 @@ function defaultState() {
     settings: {
       types: JSON.parse(JSON.stringify(DEFAULT_TYPES)),
       prep: Object.assign({}, DEFAULT_PREP),
-      mealSlots: []
+      mealSlots: [],
+      sortMode: 'room'
     },
     rooms: [],        // [{ roomNumber:'101', breakfastType:'hot' }]
     daily: {}         // { '2026-08-23': { '101':'completed' } } 未記錄者視為 pending
@@ -69,7 +70,8 @@ function loadState() {
       settings: {
         types: Array.isArray(data.settings?.types) && data.settings.types.length ? data.settings.types : base.settings.types,
         prep: Object.assign({}, DEFAULT_PREP, (data.settings && data.settings.prep) || {}),
-        mealSlots: C ? C.sortSlots(Array.isArray(data.settings?.mealSlots) ? data.settings.mealSlots : []) : []
+        mealSlots: C ? C.sortSlots(Array.isArray(data.settings?.mealSlots) ? data.settings.mealSlots : []) : [],
+        sortMode: (data.settings && data.settings.sortMode === 'name') ? 'name' : 'room'
       },
       rooms: Array.isArray(data.rooms) ? sanitizeRooms(data.rooms) : [],
       daily: (data.daily && typeof data.daily === 'object') ? data.daily : {}
@@ -317,7 +319,8 @@ function renderOrderGrid(tk) {
   const grid = $('roomGrid');
   grid.style.display = 'block';
   grid.style.gridTemplateColumns = 'none';
-  const all = sortRooms(state.rooms);
+  const byRoom = sortRooms(state.rooms);
+  const all = state.settings.sortMode === 'name' ? C.sortRoomsGrouped(byRoom) : byRoom;
   const colors = C.assignGroupColors(all, ORDER_PALETTE);
   const hotList = all.filter(C.isHotRoom);
   const normalList = all.filter(r => C.isPlatformRoom(r));
