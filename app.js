@@ -240,6 +240,16 @@ function render() {
   else $('filterChips').classList.toggle('hidden', empty);
   banner.classList.toggle('hidden', empty);
 
+  // 排序方式開關：僅訂單模式顯示
+  const sortToggle = $('sortToggle');
+  if (sortToggle) {
+    sortToggle.classList.toggle('hidden', !isOrderMode());
+    const nameMode = state.settings.sortMode === 'name';
+    sortToggle.querySelectorAll('.sort-opt').forEach(btn => {
+      btn.classList.toggle('active', (btn.dataset.sort === 'name') === nameMode);
+    });
+  }
+
   renderGrid(tk);
 }
 
@@ -1344,6 +1354,14 @@ function bindEvents() {
     if (!chip) return;
     currentFilter = chip.dataset.filter;
     renderGrid(todayKey());
+  });
+
+  $('sortToggle').addEventListener('click', e => {
+    const btn = e.target.closest('.sort-opt');
+    if (!btn) return;
+    state.settings.sortMode = btn.dataset.sort;
+    saveState();
+    render();
   });
 
   document.querySelectorAll('.stat-card[data-filter]').forEach(el => {
