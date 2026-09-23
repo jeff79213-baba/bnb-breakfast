@@ -119,9 +119,36 @@
     return map;
   }
 
+  function roomKeyOf(r) {
+    return String(r && r.roomNumber != null ? r.roomNumber : '').trim();
+  }
+
+  function roomNumberCmp(a, b) {
+    const na = parseInt(a, 10), nb = parseInt(b, 10);
+    const bothNum = !isNaN(na) && !isNaN(nb) && String(na) === a && String(nb) === b;
+    if (bothNum) return na - nb;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
+  function sortRoomsGrouped(list) {
+    const rooms = (list || []).slice();
+    rooms.sort((x, y) => roomNumberCmp(roomKeyOf(x), roomKeyOf(y)));
+    const named = new Map();
+    const unnamed = [];
+    for (const r of rooms) {
+      const name = String(r && r.guestName ? r.guestName : '').trim();
+      if (!name) { unnamed.push(r); continue; }
+      if (!named.has(name)) named.set(name, []);
+      named.get(name).push(r);
+    }
+    const groups = [...named.values()];
+    groups.sort((a, b) => roomNumberCmp(roomKeyOf(a[0]), roomKeyOf(b[0])));
+    return groups.flat().concat(unnamed);
+  }
+
   return {
     HOT_SOURCES, isHotSource, isNoAdd, isAddon, isHotRoom, isPlatformRoom,
     isNoMeal, computeHotPending, computeStats, normalizeSlots, addSlot,
-    enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors
+    enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors, sortRoomsGrouped
   };
 });

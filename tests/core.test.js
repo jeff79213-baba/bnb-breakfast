@@ -124,3 +124,45 @@ test('assignGroupColors: 依 orderId 分組、空 orderId 退 source、穩定', 
   assert.strictEqual(m['106'], m2['106']); // 穩定
   assert.strictEqual(m['312'], m2['312']);
 });
+
+test('sortRoomsGrouped: 同姓名相鄰、組間依最小房號、組內依房號', () => {
+  const rooms = [
+    { roomNumber: '305', guestName: '王小明' },
+    { roomNumber: '306', guestName: '陳大文' },
+    { roomNumber: '308', guestName: '王小明' },
+    { roomNumber: '502', guestName: '王小明' },
+    { roomNumber: '201', guestName: '陳大文' },
+  ];
+  const out = C.sortRoomsGrouped(rooms).map(r => r.roomNumber);
+  // 陳大文組最小 201 < 王小明組最小 305 → 陳大文組在前
+  assert.deepStrictEqual(out, ['201', '306', '305', '308', '502']);
+});
+
+test('sortRoomsGrouped: 無姓名房排最後（依房號）', () => {
+  const rooms = [
+    { roomNumber: '502', guestName: '王小明' },
+    { roomNumber: '305', guestName: '王小明' },
+    { roomNumber: '101', guestName: '' },
+    { roomNumber: '601', guestName: '   ' },
+    { roomNumber: '308', guestName: '王小明' },
+  ];
+  const out = C.sortRoomsGrouped(rooms).map(r => r.roomNumber);
+  assert.deepStrictEqual(out, ['305', '308', '502', '101', '601']);
+});
+
+test('sortRoomsGrouped: 多組 + 無姓名混合、結果穩定、空輸入', () => {
+  const rooms = [
+    { roomNumber: '507', guestName: '' },
+    { roomNumber: '305', guestName: '王小' },
+    { roomNumber: '502', guestName: '王小' },
+    { roomNumber: '201', guestName: '陳大' },
+    { roomNumber: '308', guestName: '王小' },
+    { roomNumber: '306', guestName: '陳大' },
+    { roomNumber: '101', guestName: '' },
+  ];
+  const expected = ['201', '306', '305', '308', '502', '101', '507'];
+  assert.deepStrictEqual(C.sortRoomsGrouped(rooms).map(r => r.roomNumber), expected);
+  assert.deepStrictEqual(C.sortRoomsGrouped(rooms).map(r => r.roomNumber), expected); // 穩定
+  assert.deepStrictEqual(C.sortRoomsGrouped([]), []);
+  assert.deepStrictEqual(C.sortRoomsGrouped(undefined), []);
+});
