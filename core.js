@@ -52,6 +52,23 @@
     return n;
   }
 
+  function computeHotPeople(rooms, statusOf) {
+    const zero = () => ({ adult: 0, kid: 0, people: 0 });
+    const total = zero();
+    const pending = zero();
+    for (const r of (rooms || [])) {
+      if (!isHotRoom(r)) continue;
+      if (isNoMeal(r)) continue;
+      const adult = Number(r.adult) || 0;
+      const kid = (Number(r.child) || 0) + (Number(r.infant) || 0);
+      total.adult += adult; total.kid += kid; total.people += adult + kid;
+      if (statusOf(r) !== 'completed') {
+        pending.adult += adult; pending.kid += kid; pending.people += adult + kid;
+      }
+    }
+    return { total, pending };
+  }
+
   function computeStats(rooms, statusOf) {
     let hot = 0, normal = 0, addon = 0, completed = 0;
     for (const r of (rooms || [])) {
@@ -148,7 +165,8 @@
 
   return {
     HOT_SOURCES, isHotSource, isNoAdd, isAddon, isHotRoom, isPlatformRoom,
-    isNoMeal, computeHotPending, computeStats, normalizeSlots, addSlot,
-    enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors, sortRoomsGrouped
+    isNoMeal, computeHotPending, computeHotPeople, computeStats, normalizeSlots,
+    addSlot, enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors,
+    sortRoomsGrouped
   };
 });

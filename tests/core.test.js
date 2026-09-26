@@ -166,3 +166,71 @@ test('sortRoomsGrouped: 多組 + 無姓名混合、結果穩定、空輸入', ()
   assert.deepStrictEqual(C.sortRoomsGrouped([]), []);
   assert.deepStrictEqual(C.sortRoomsGrouped(undefined), []);
 });
+
+test('computeHotPeople: 基本加總（熟食總人數 = 大人 + 小孩）', () => {
+  const rooms = [
+    { roomNumber: '101', source: '官網', adult: 2, child: 1, infant: 0 },
+    { roomNumber: '308', source: 'Agoda', eggMilk: '加購', adult: 1, child: 2, infant: 0 },
+  ];
+  const out = C.computeHotPeople(rooms, () => 'pending');
+  assert.deepStrictEqual(out.total, { adult: 3, kid: 3, people: 6 });
+  assert.deepStrictEqual(out.pending, { adult: 3, kid: 3, people: 6 });
+});
+
+test('computeHotPeople: 小孩 = child + infant（訂單模式三欄）', () => {
+  const rooms = [{ roomNumber: '201', source: '官網', adult: 2, child: 1, infant: 2 }];
+  const out = C.computeHotPeople(rooms, () => 'pending');
+  assert.strictEqual(out.total.adult, 2);
+  assert.strictEqual(out.total.kid, 3);
+  assert.strictEqual(out.total.people, 5);
+});
+
+test('computeHotPeople: 已用餐的房間整間扣除（total 不變、pending 減）', () => {
+  const rooms = [
+    { roomNumber: '101', source: '官網', adult: 2, child: 1, infant: 1 },
+    { roomNumber: '308', source: 'Agoda', eggMilk: '加購', adult: 1, child: 0, infant: 0 },
+  ];
+  const oneDone = C.computeHotPeople(rooms, (r) => (r.roomNumber === '101' ? 'completed' : 'pending'));
+  assert.deepStrictEqual(oneDone.total, { adult: 3, kid: 2, people: 5 });
+  assert.deepStrictEqual(oneDone.pending, { adult: 1, kid: 0, people: 1 });
+  const allDone = C.computeHotPeople(rooms, () => 'completed');
+  assert.deepStrictEqual(allDone.total, { adult: 3, kid: 2, people: 5 });
+  assert.deepStrictEqual(allDone.pending, { adult: 0, kid: 0, people: 0 });
+});
+
+test('computeHotPeople: 排除不用餐的房間（isNoMeal）', () => {
+  const rooms = [
+    { roomNumber: '101', source: '官網', adult: 2, child: 1, mealTime: '' },
+    { roomNumber: '102', source: '手動訂單', adult: 3, child: 3, mealTime: '不用餐' },
+  ];
+  const out = C.computeHotPeople(rooms, () => 'pending');
+  assert.deepStrictEqual(out.total, { adult: 2, kid: 1, people: 3 });
+  assert.deepStrictEqual(out.pending, { adult: 2, kid: 1, people: 3 });
+});
+
+test('computeHotPeople: 排除非熟食房（平台房、不加購房）', () => {
+  const rooms = [
+    { roomNumber: '101', source: '官網', adult: 2, child: 1 },
+    { roomNumber: '312', source: 'Booking.com', adult: 4, child: 4 },
+    { roomNumber: '507', source: '官網', vegan: '不加購', adult: 5, child: 5 },
+  ];
+  const out = C.computeHotPeople(rooms, () => 'pending');
+  assert.deepStrictEqual(out.total, { adult: 2, kid: 1, people: 3 });
+  assert.deepStrictEqual(out.pending, { adult: 2, kid: 1, people: 3 });
+});
+
+test('computeHotPeople: 空／undefined 輸入回傳全 0', () => {
+  const expected = {
+    total: { adult: 0, kid: 0, people: 0 },
+    pending: { adult: 0, kid: 0, people: 0 },
+  };
+  assert.deepStrictEqual(C.computeHotPeople([], () => 'pending'), expected);
+  assert.deepStrictEqual(C.computeHotPeople(undefined, () => 'pending'), expected);
+});
+
+test('computeHotPeople: 舊純房號模式（無人數欄位）回傳全 0', () => {
+  const rooms = [{ roomNumber: '101', source: '官網', vegan: '', eggMilk: '' }];
+  const out = C.computeHotPeople(rooms, () => 'pending');
+  assert.deepStrictEqual(out.total, { adult: 0, kid: 0, people: 0 });
+  assert.deepStrictEqual(out.pending, { adult: 0, kid: 0, people: 0 });
+});
