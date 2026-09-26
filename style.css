@@ -98,10 +98,12 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
   width: 100%; margin-top: 12px;
   border: none; border-radius: 14px;
   padding: 16px;
-  font-size: 19px; font-weight: 800;
   text-align: center;
   box-shadow: 0 3px 10px rgba(232,89,12,.35);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
+.hot-banner-main { font-size: 19px; font-weight: 800; line-height: 1.25; }
+.hot-banner-sub { font-size: 12px; font-weight: 600; opacity: .85; line-height: 1.4; }
 .hot-banner.alert {
   background: linear-gradient(135deg, #ff922b, #e8590c);
   color: #fff;

@@ -220,17 +220,26 @@ function render() {
   const pct = s.total ? Math.round(s.completed / s.total * 100) : 0;
   $('progressBar').style.width = pct + '%';
 
-  // 熟食警示橫幅（簡約線條）
+  // 熟食警示橫幅（主行：未用餐間數／次行：熟食與未食用人數）
   const banner = $('hotAlertBanner');
   const hotPending = C.computeHotPending(state.rooms, r => getStatus(tk, r.roomNumber));
+  const hotPeople = C.computeHotPeople(state.rooms, r => getStatus(tk, r.roomNumber));
   banner.classList.remove('hidden');
+  let bannerMain;
   if (hotPending > 0) {
-    banner.textContent = `尚有 ${hotPending} 間熟食未用餐`;
+    bannerMain = `尚有 ${hotPending} 間熟食未用餐`;
     banner.className = 'hot-banner alert';
   } else {
-    banner.textContent = s.hot > 0 ? '熟食已全數用餐完成' : '今日尚無熟食房號';
+    bannerMain = s.hot > 0 ? '熟食已全數用餐完成' : '今日尚無熟食房號';
     banner.className = 'hot-banner ok';
   }
+  let bannerSub = '';
+  if (hotPeople.total.people > 0) {
+    const t = hotPeople.total, p = hotPeople.pending;
+    bannerSub = `熟食 ${t.people} 人（大人${t.adult} 小孩${t.kid}）　未食用 ${p.people} 人（大人${p.adult} 小孩${p.kid}）`;
+  }
+  banner.innerHTML = `<span class="hot-banner-main">${bannerMain}</span>`
+    + (bannerSub ? `<span class="hot-banner-sub">${bannerSub}</span>` : '');
 
   // 空白狀態
   const empty = state.rooms.length === 0;
