@@ -234,3 +234,39 @@ test('computeHotPeople: 舊純房號模式（無人數欄位）回傳全 0', () 
   assert.deepStrictEqual(out.total, { adult: 0, kid: 0, people: 0 });
   assert.deepStrictEqual(out.pending, { adult: 0, kid: 0, people: 0 });
 });
+
+test('clearRooms: 清空房號，但 settings 與 daily 完整保留', () => {
+  const state = {
+    version: 1,
+    settings: {
+      types: [{ id: 'hot', label: '熱食', emoji: '🔥' }],
+      prep: { jellyRatio: 1.1, eggRatio: 1.5, riceAdult: 0.2, riceChild: 0.1, specialDiv: 12 },
+      mealSlots: [{ label: '07:30', enabled: true }],
+      sortMode: 'name'
+    },
+    rooms: [{ roomNumber: '101', breakfastType: 'hot' }, { roomNumber: '205', breakfastType: 'hot' }],
+    daily: { '2026-10-03': { '101': 'completed' } }
+  };
+  const before = JSON.parse(JSON.stringify(state));
+  const next = C.clearRooms(state);
+
+  assert.deepStrictEqual(next.rooms, []);
+  assert.deepStrictEqual(next.settings, before.settings);
+  assert.deepStrictEqual(next.daily, before.daily);
+  assert.strictEqual(next.version, 1);
+});
+
+test('clearRooms: 不 mutate 傳入的 state', () => {
+  const state = {
+    settings: { prep: { jellyRatio: 1.1 }, types: [], mealSlots: [], sortMode: 'room' },
+    rooms: [{ roomNumber: '101' }],
+    daily: {}
+  };
+  C.clearRooms(state);
+  assert.strictEqual(state.rooms.length, 1);
+});
+
+test('clearRooms: rooms 本來就是空陣列時仍回傳空陣列', () => {
+  const next = C.clearRooms({ version: 1, settings: {}, rooms: [], daily: {} });
+  assert.deepStrictEqual(next.rooms, []);
+});

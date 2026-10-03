@@ -163,10 +163,15 @@
     return groups.flat().concat(unnamed);
   }
 
+  // 清空房號清單；settings（備料比例等）與 daily（用餐紀錄）原樣保留
+  function clearRooms(state) {
+    return Object.assign({}, state, { rooms: [] });
+  }
+
   return {
     HOT_SOURCES, isHotSource, isNoAdd, isAddon, isHotRoom, isPlatformRoom,
     isNoMeal, computeHotPending, computeHotPeople, computeStats, normalizeSlots,
     addSlot, enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors,
-    sortRoomsGrouped
+    sortRoomsGrouped, clearRooms
   };
 });
