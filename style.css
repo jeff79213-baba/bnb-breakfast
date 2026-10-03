@@ -223,6 +223,7 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
 .btn.subtle { background: transparent; border-color: transparent; color: var(--muted); }
 .btn.full { width: 100%; }
 .list-btn { width: 100%; text-align: left; margin-top: 10px; }
+.list-btn.danger-text { color: var(--danger); }
 
 .row-actions { display: flex; gap: 10px; margin-top: 18px; }
 .row-actions .btn { flex: 1; }

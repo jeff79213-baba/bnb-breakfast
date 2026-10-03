@@ -96,6 +96,7 @@
     <h2>功能選單</h2>
     <button class="btn list-btn" id="menuManageBtn">🏠 管理房號</button>
     <button class="btn list-btn" id="menuImportBtn">📂 匯入資料（Excel / CSV）</button>
+    <button class="btn list-btn danger-text" id="menuClearBtn">🗑️ 清空房號</button>
     <button class="btn list-btn" id="menuPrepBtn">🧮 備料區</button>
     <button class="btn list-btn" id="menuSlotsBtn">🍳 早餐用餐時間</button>
     <button class="btn list-btn" id="menuExportBtn">📤 匯出今日紀錄</button>
@@ -130,6 +131,20 @@
     <div class="row-actions">
       <button class="btn danger" id="importCancelBtn">取消</button>
       <button class="btn primary" id="importConfirmBtn">確認匯入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 清空房號確認 -->
+<div class="modal-backdrop hidden" id="clearModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>🗑️ 清空房號</h2>
+    <p class="hint" id="clearSummary">將清空目前 <b>0</b> 間房號。</p>
+    <p class="hint">備料設定與用餐紀錄不會變動。</p>
+    <div class="row-actions">
+      <button class="btn subtle" id="clearCancelBtn">取消</button>
+      <button class="btn danger" id="clearConfirmBtn">確定清空</button>
     </div>
   </div>
 </div>

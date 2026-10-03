@@ -1344,6 +1344,22 @@ function exportToday() {
   toast('📤 已匯出今日紀錄');
 }
 
+// ===== 清空房號 =====
+function openClearConfirm() {
+  $('clearSummary').innerHTML = `將清空目前 <b>${state.rooms.length}</b> 間房號。`;
+  openModal('clearModal');
+}
+
+function doClearRooms() {
+  const n = state.rooms.length;
+  state = C.clearRooms(state);
+  saveState();
+  closeModal('clearModal');
+  closeModal('menuModal');
+  render();
+  toast(`🗑️ 已清空 ${n} 間房號`);
+}
+
 // ===== 事件綁定 =====
 function bindEvents() {
   // 卡片點擊＝一鍵切換用餐狀態（核心操作）
@@ -1390,6 +1406,9 @@ function bindEvents() {
   $('menuCloseBtn').addEventListener('click', () => closeModal('menuModal'));
   $('menuManageBtn').addEventListener('click', () => { closeModal('menuModal'); openManage(); });
   $('menuImportBtn').addEventListener('click', () => { closeModal('menuModal'); $('fileInput').click(); });
+  $('menuClearBtn').addEventListener('click', () => { closeModal('menuModal'); openClearConfirm(); });
+  $('clearCancelBtn').addEventListener('click', () => closeModal('clearModal'));
+  $('clearConfirmBtn').addEventListener('click', doClearRooms);
   $('menuExportBtn').addEventListener('click', exportToday);
   $('menuPrepBtn').addEventListener('click', () => { closeModal('menuModal'); openPrep(); });
 
