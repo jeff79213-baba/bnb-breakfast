@@ -342,7 +342,7 @@ function renderOrderGrid(tk) {
   let all = byRoom;
   if (state.settings.sortMode === 'name') all = C.sortRoomsGrouped(byRoom);
   else if (state.settings.sortMode === 'time') all = C.sortRoomsByMealTime(byRoom);
-  const colors = C.assignGroupColors(all, ORDER_PALETTE);
+  const colors = C.assignGroupColors(byRoom, ORDER_PALETTE);
   const hotList = all.filter(C.isHotRoom);
   const normalList = all.filter(r => C.isPlatformRoom(r));
   const mkRow = (r) => {
