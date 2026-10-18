@@ -71,7 +71,7 @@ function loadState() {
         types: Array.isArray(data.settings?.types) && data.settings.types.length ? data.settings.types : base.settings.types,
         prep: Object.assign({}, DEFAULT_PREP, (data.settings && data.settings.prep) || {}),
         mealSlots: C ? C.sortSlots(Array.isArray(data.settings?.mealSlots) ? data.settings.mealSlots : []) : [],
-        sortMode: (data.settings && data.settings.sortMode === 'name') ? 'name' : 'room'
+        sortMode: (data.settings && ['name', 'time'].includes(data.settings.sortMode)) ? data.settings.sortMode : 'room'
       },
       rooms: Array.isArray(data.rooms) ? sanitizeRooms(data.rooms) : [],
       daily: (data.daily && typeof data.daily === 'object') ? data.daily : {}
@@ -253,9 +253,9 @@ function render() {
   const sortToggle = $('sortToggle');
   if (sortToggle) {
     sortToggle.classList.toggle('hidden', !isOrderMode());
-    const nameMode = state.settings.sortMode === 'name';
+    const mode = state.settings.sortMode;
     sortToggle.querySelectorAll('.sort-opt').forEach(btn => {
-      btn.classList.toggle('active', (btn.dataset.sort === 'name') === nameMode);
+      btn.classList.toggle('active', btn.dataset.sort === mode);
     });
   }
 
@@ -339,7 +339,9 @@ function renderOrderGrid(tk) {
   grid.style.display = 'block';
   grid.style.gridTemplateColumns = 'none';
   const byRoom = sortRooms(state.rooms);
-  const all = state.settings.sortMode === 'name' ? C.sortRoomsGrouped(byRoom) : byRoom;
+  let all = byRoom;
+  if (state.settings.sortMode === 'name') all = C.sortRoomsGrouped(byRoom);
+  else if (state.settings.sortMode === 'time') all = C.sortRoomsByMealTime(byRoom);
   const colors = C.assignGroupColors(all, ORDER_PALETTE);
   const hotList = all.filter(C.isHotRoom);
   const normalList = all.filter(r => C.isPlatformRoom(r));
