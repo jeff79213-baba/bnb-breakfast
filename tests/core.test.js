@@ -270,3 +270,69 @@ test('clearRooms: rooms 本來就是空陣列時仍回傳空陣列', () => {
   const next = C.clearRooms({ version: 1, settings: {}, rooms: [], daily: {} });
   assert.deepStrictEqual(next.rooms, []);
 });
+
+test('sortRoomsByMealTime: 依時間早→晚排序', () => {
+  const rooms = [
+    { roomNumber: '101', mealTime: '09:00' },
+    { roomNumber: '102', mealTime: '07:30' },
+    { roomNumber: '103', mealTime: '08:00' },
+  ];
+  assert.deepStrictEqual(
+    C.sortRoomsByMealTime(rooms).map(r => r.roomNumber),
+    ['102', '103', '101']
+  );
+});
+
+test('sortRoomsByMealTime: 無時間／不用餐殿後，該組內依房號', () => {
+  const rooms = [
+    { roomNumber: '105', mealTime: '' },
+    { roomNumber: '101', mealTime: '08:00' },
+    { roomNumber: '103', mealTime: '不用餐' },
+    { roomNumber: '102', mealTime: '07:00' },
+    { roomNumber: '104', mealTime: '  ' },
+  ];
+  assert.deepStrictEqual(
+    C.sortRoomsByMealTime(rooms).map(r => r.roomNumber),
+    ['102', '101', '103', '104', '105']
+  );
+});
+
+test('sortRoomsByMealTime: 同時間併列依房號', () => {
+  const rooms = [
+    { roomNumber: '308', mealTime: '08:00' },
+    { roomNumber: '101', mealTime: '08:00' },
+    { roomNumber: '205', mealTime: '08:00' },
+  ];
+  assert.deepStrictEqual(
+    C.sortRoomsByMealTime(rooms).map(r => r.roomNumber),
+    ['101', '205', '308']
+  );
+});
+
+test('sortRoomsByMealTime: 無效時間格式視為無時間', () => {
+  const rooms = [
+    { roomNumber: '101', mealTime: '9:7' },
+    { roomNumber: '102', mealTime: '13:00' },
+    { roomNumber: '103', mealTime: '08:3' },
+    { roomNumber: '104', mealTime: '08:00' },
+  ];
+  assert.deepStrictEqual(
+    C.sortRoomsByMealTime(rooms).map(r => r.roomNumber),
+    ['104', '101', '102', '103']
+  );
+});
+
+test('sortRoomsByMealTime: 不修改原陣列', () => {
+  const rooms = [
+    { roomNumber: '101', mealTime: '09:00' },
+    { roomNumber: '102', mealTime: '07:00' },
+  ];
+  const copy = rooms.map(r => r.roomNumber);
+  C.sortRoomsByMealTime(rooms);
+  assert.deepStrictEqual(rooms.map(r => r.roomNumber), copy);
+});
+
+test('sortRoomsByMealTime: 空／undefined 輸入回傳 []', () => {
+  assert.deepStrictEqual(C.sortRoomsByMealTime([]), []);
+  assert.deepStrictEqual(C.sortRoomsByMealTime(undefined), []);
+});

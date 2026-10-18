@@ -163,6 +163,21 @@
     return groups.flat().concat(unnamed);
   }
 
+  function sortRoomsByMealTime(list) {
+    const rooms = (list || []).slice();
+    rooms.sort((x, y) => {
+      const tx = timeOf(x && x.mealTime);
+      const ty = timeOf(y && y.mealTime);
+      if (tx && ty) {
+        const d = tx.h - ty.h || tx.m - ty.m;
+        if (d !== 0) return d;
+      } else if (tx) return -1;
+      else if (ty) return 1;
+      return roomNumberCmp(roomKeyOf(x), roomKeyOf(y));
+    });
+    return rooms;
+  }
+
   // 清空房號清單；settings（備料比例等）與 daily（用餐紀錄）原樣保留
   function clearRooms(state) {
     return Object.assign({}, state, { rooms: [] });
@@ -172,6 +187,6 @@
     HOT_SOURCES, isHotSource, isNoAdd, isAddon, isHotRoom, isPlatformRoom,
     isNoMeal, computeHotPending, computeHotPeople, computeStats, normalizeSlots,
     addSlot, enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors,
-    sortRoomsGrouped, clearRooms
+    sortRoomsGrouped, sortRoomsByMealTime, clearRooms
   };
 });
