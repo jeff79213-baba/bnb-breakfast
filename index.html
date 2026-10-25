@@ -97,6 +97,7 @@
     <h2>功能選單</h2>
     <button class="btn list-btn" id="menuManageBtn">🏠 管理房號</button>
     <button class="btn list-btn" id="menuImportBtn">📂 匯入資料（Excel / CSV）</button>
+    <button class="btn list-btn" id="menuClearNotesBtn">🧹 清今日備註</button>
     <button class="btn list-btn danger-text" id="menuClearBtn">🗑️ 清空房號</button>
     <button class="btn list-btn" id="menuPrepBtn">🧮 備料區</button>
     <button class="btn list-btn" id="menuSlotsBtn">🍳 早餐用餐時間</button>
@@ -305,6 +306,22 @@
     </div>
     <div class="manage-list" id="slotsList"></div>
     <button class="btn subtle full" id="slotsCloseBtn">完成</button>
+  </div>
+</div>
+
+<!-- 房號備註 -->
+<div class="modal-backdrop hidden" id="noteModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="noteModalTitle">房號備註</h2>
+    <label class="field-label">已用餐幾人</label>
+    <textarea id="noteEatenInput" rows="2" placeholder="例：1大 07:30 已吃，餘 1大2小 09:00" style="width:100%;border:2px solid #dee2e6;border-radius:12px;padding:10px 14px;font-size:17px;font-family:inherit;resize:vertical"></textarea>
+    <label class="field-label">素食／蛋奶素備註</label>
+    <textarea id="noteVegInput" rows="2" placeholder="例：1人全素，其餘葷" style="width:100%;border:2px solid #dee2e6;border-radius:12px;padding:10px 14px;font-size:17px;font-family:inherit;resize:vertical"></textarea>
+    <div class="row-actions">
+      <button class="btn" id="noteCancelBtn">取消</button>
+      <button class="btn primary" id="noteSaveBtn">存檔</button>
+    </div>
   </div>
 </div>
 

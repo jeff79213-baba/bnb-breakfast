@@ -183,10 +183,92 @@
     return Object.assign({}, state, { rooms: [] });
   }
 
+  /* ===== 房號備註（自由文字，與 rooms/daily/settings 完全分離） =====
+     notes = { '2026-10-25': { '201': { eaten:'1大已吃', veg:'1人全素' } } } */
+  const NOTE_FIELDS = ['eaten', 'veg'];
+  const NOTE_MAX = 300;
+
+  function cleanNoteText(v) {
+    return String(v == null ? '' : v).trim().slice(0, NOTE_MAX);
+  }
+
+  function noteGet(notes, dateKey, roomNo, field) {
+    const day = notes && notes[dateKey];
+    const rec = day && day[String(roomNo)];
+    const v = rec && rec[field];
+    return typeof v === 'string' ? v : '';
+  }
+
+  // 空值會刪掉該欄；該房無備註刪房號 key；該日無備註刪日期 key
+  function noteSet(notes, dateKey, roomNo, field, value) {
+    const next = Object.assign({}, notes || {});
+    const day = Object.assign({}, next[dateKey] || {});
+    const key = String(roomNo);
+    const rec = Object.assign({}, day[key] || {});
+    const clean = cleanNoteText(value);
+    if (clean) rec[field] = clean;
+    else delete rec[field];
+    if (Object.keys(rec).length) day[key] = rec;
+    else delete day[key];
+    if (Object.keys(day).length) next[dateKey] = day;
+    else delete next[dateKey];
+    return next;
+  }
+
+  function noteCount(notes, dateKey, roomNo) {
+    const day = notes && notes[dateKey];
+    const rec = day && day[String(roomNo)];
+    if (!rec) return 0;
+    return NOTE_FIELDS.filter(f => rec[f]).length;
+  }
+
+  function migrateNote(notes, dateKey, from, to) {
+    const f = String(from), t = String(to);
+    if (f === t) return notes;
+    const day = notes && notes[dateKey];
+    if (!day || !day[f]) return notes;
+    const next = Object.assign({}, notes);
+    const nd = Object.assign({}, day);
+    nd[t] = nd[f];
+    delete nd[f];
+    next[dateKey] = nd;
+    return next;
+  }
+
+  function clearNotesForDate(notes, dateKey) {
+    const next = Object.assign({}, notes || {});
+    delete next[dateKey];
+    return next;
+  }
+
+  function sanitizeNotes(notes) {
+    if (!notes || typeof notes !== 'object' || Array.isArray(notes)) return {};
+    const out = {};
+    for (const dk of Object.keys(notes)) {
+      const day = notes[dk];
+      if (!day || typeof day !== 'object' || Array.isArray(day)) continue;
+      const d = {};
+      for (const rk of Object.keys(day)) {
+        const rec = day[rk];
+        if (!rec || typeof rec !== 'object' || Array.isArray(rec)) continue;
+        const r = {};
+        for (const f of NOTE_FIELDS) {
+          const v = cleanNoteText(rec[f]);
+          if (v) r[f] = v;
+        }
+        if (Object.keys(r).length) d[String(rk)] = r;
+      }
+      if (Object.keys(d).length) out[String(dk)] = d;
+    }
+    return out;
+  }
+
   return {
     HOT_SOURCES, isHotSource, isNoAdd, isAddon, isHotRoom, isPlatformRoom,
     isNoMeal, computeHotPending, computeHotPeople, computeStats, normalizeSlots,
     addSlot, enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors,
-    sortRoomsGrouped, sortRoomsByMealTime, clearRooms
+    sortRoomsGrouped, sortRoomsByMealTime, clearRooms,
+    NOTE_FIELDS, NOTE_MAX, noteGet, noteSet, noteCount, migrateNote,
+    clearNotesForDate, sanitizeNotes
   };
 });

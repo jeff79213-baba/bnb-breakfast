@@ -336,3 +336,92 @@ test('sortRoomsByMealTime: 空／undefined 輸入回傳 []', () => {
   assert.deepStrictEqual(C.sortRoomsByMealTime([]), []);
   assert.deepStrictEqual(C.sortRoomsByMealTime(undefined), []);
 });
+
+// ===== 房號備註 =====
+
+test('noteGet: 缺值一律回空字串', () => {
+  assert.strictEqual(C.noteGet(null, '2026-10-25', '201', 'eaten'), '');
+  assert.strictEqual(C.noteGet({}, '2026-10-25', '201', 'eaten'), '');
+  assert.strictEqual(C.noteGet({ '2026-10-25': {} }, '2026-10-25', '201', 'eaten'), '');
+  assert.strictEqual(C.noteGet({ '2026-10-25': { '201': {} } }, '2026-10-25', '201', 'eaten'), '');
+  const notes = { '2026-10-25': { '201': { eaten: '1大已吃' } } };
+  assert.strictEqual(C.noteGet(notes, '2026-10-25', '201', 'eaten'), '1大已吃');
+  assert.strictEqual(C.noteGet(notes, '2026-10-25', '201', 'veg'), '');
+});
+
+test('noteSet: 回傳新物件，不改動原本的 notes', () => {
+  const notes = {};
+  const next = C.noteSet(notes, '2026-10-25', '201', 'eaten', '1大已吃');
+  assert.deepStrictEqual(notes, {});
+  assert.strictEqual(C.noteGet(next, '2026-10-25', '201', 'eaten'), '1大已吃');
+});
+
+test('noteSet: 空字串／純空白會刪掉欄位、房號 key、日期 key', () => {
+  let notes = C.noteSet({}, '2026-10-25', '201', 'eaten', '有值');
+  notes = C.noteSet(notes, '2026-10-25', '201', 'veg', '也有的值');
+  notes = C.noteSet(notes, '2026-10-25', '201', 'eaten', '   ');
+  assert.deepStrictEqual(notes, { '2026-10-25': { '201': { veg: '也有的值' } } });
+  notes = C.noteSet(notes, '2026-10-25', '201', 'veg', '');
+  assert.deepStrictEqual(notes, {});
+});
+
+test('noteSet: 超過上限會截斷至 NOTE_MAX', () => {
+  const long = 'あ'.repeat(C.NOTE_MAX + 50);
+  const notes = C.noteSet({}, '2026-10-25', '201', 'veg', long);
+  const v = C.noteGet(notes, '2026-10-25', '201', 'veg');
+  assert.strictEqual(v.length, C.NOTE_MAX);
+});
+
+test('noteCount: 計數有值的備註條數', () => {
+  assert.strictEqual(C.noteCount({}, '2026-10-25', '201'), 0);
+  let notes = C.noteSet({}, '2026-10-25', '201', 'eaten', '1大');
+  assert.strictEqual(C.noteCount(notes, '2026-10-25', '201'), 1);
+  notes = C.noteSet(notes, '2026-10-25', '201', 'veg', '1人素');
+  assert.strictEqual(C.noteCount(notes, '2026-10-25', '201'), 2);
+});
+
+test('migrateNote: 換房時搬移並刪除舊房號', () => {
+  const notes = C.noteSet({}, '2026-10-25', '201', 'eaten', '1大已吃');
+  const next = C.migrateNote(notes, '2026-10-25', '201', '205');
+  assert.strictEqual(C.noteGet(next, '2026-10-25', '205', 'eaten'), '1大已吃');
+  assert.strictEqual(C.noteGet(next, '2026-10-25', '201', 'eaten'), '');
+  assert.strictEqual(C.noteGet(notes, '2026-10-25', '201', 'eaten'), '1大已吃');
+});
+
+test('migrateNote: 同房號或來源不存在時為 no-op', () => {
+  const notes = C.noteSet({}, '2026-10-25', '201', 'eaten', '1大');
+  assert.strictEqual(C.migrateNote(notes, '2026-10-25', '201', '201'), notes);
+  assert.strictEqual(C.migrateNote(notes, '2026-10-25', '999', '205'), notes);
+  assert.deepStrictEqual(C.migrateNote({}, '2026-10-25', '201', '205'), {});
+});
+
+test('clearNotesForDate: 只清指定日期，其他日期保留', () => {
+  let notes = C.noteSet({}, '2026-10-25', '201', 'eaten', 'a');
+  notes = C.noteSet(notes, '2026-10-26', '201', 'eaten', 'b');
+  const next = C.clearNotesForDate(notes, '2026-10-25');
+  assert.strictEqual(next['2026-10-25'], undefined);
+  assert.strictEqual(C.noteGet(next, '2026-10-26', '201', 'eaten'), 'b');
+});
+
+test('sanitizeNotes: 壞形狀一律回 {}', () => {
+  assert.deepStrictEqual(C.sanitizeNotes(null), {});
+  assert.deepStrictEqual(C.sanitizeNotes(undefined), {});
+  assert.deepStrictEqual(C.sanitizeNotes([]), {});
+  assert.deepStrictEqual(C.sanitizeNotes('x'), {});
+  assert.deepStrictEqual(C.sanitizeNotes({ '2026-10-25': 'not-object' }), {});
+  assert.deepStrictEqual(C.sanitizeNotes({ '2026-10-25': { '201': 'not-object' } }), {});
+});
+
+test('sanitizeNotes: 清掉非字串、空值與超長內容', () => {
+  const dirty = {
+    '2026-10-25': {
+      '201': { eaten: '  1大已吃  ', veg: '', bad: 123 },
+      '202': { eaten: null },
+    },
+    '2026-10-26': { 'dummy': {} },
+  };
+  const clean = C.sanitizeNotes(dirty);
+  assert.deepStrictEqual(clean, { '2026-10-25': { '201': { eaten: '1大已吃' } } });
+  const long = { '2026-10-25': { '201': { veg: 'x'.repeat(C.NOTE_MAX + 10) } } };
+  assert.strictEqual(C.sanitizeNotes(long)['2026-10-25']['201'].veg.length, C.NOTE_MAX);
+});

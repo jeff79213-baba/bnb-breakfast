@@ -54,7 +54,8 @@ function defaultState() {
       sortMode: 'room'
     },
     rooms: [],        // [{ roomNumber:'101', breakfastType:'hot' }]
-    daily: {}         // { '2026-08-23': { '101':'completed' } } 未記錄者視為 pending
+    daily: {},        // { '2026-08-23': { '101':'completed' } } 未記錄者視為 pending
+    notes: {}         // { '2026-08-23': { '101': { eaten:'1大已吃', veg:'1人全素' } } }
   };
 }
 
@@ -74,7 +75,8 @@ function loadState() {
         sortMode: (data.settings && ['name', 'time'].includes(data.settings.sortMode)) ? data.settings.sortMode : 'room'
       },
       rooms: Array.isArray(data.rooms) ? sanitizeRooms(data.rooms) : [],
-      daily: (data.daily && typeof data.daily === 'object') ? data.daily : {}
+      daily: (data.daily && typeof data.daily === 'object') ? data.daily : {},
+      notes: C ? C.sanitizeNotes(data.notes) : {}
     };
   } catch (e) {
     console.error('資料載入失敗', e);
@@ -167,7 +169,18 @@ function toggleStatus(dateKey, roomNumber) {
   return next;
 }
 
-function isOrderMode() { return state.rooms.length && state.rooms[0] && 'infant' in state.rooms[0]; }
+// ===== 房號備註（自由文字，獨立於 rooms/daily/settings）=====
+function getNote(dateKey, roomNo, field) { return C.noteGet(state.notes, dateKey, roomNo, field); }
+function setNote(dateKey, roomNo, field, value) { state.notes = C.noteSet(state.notes, dateKey, roomNo, field, value); }
+function noteCountOf(dateKey, roomNo) { return C.noteCount(state.notes, dateKey, roomNo); }
+// 有備註才顯示 ＊；兩條都有也只顯示一顆（避免觸控點擠在一起）
+function noteStar(dateKey, roomNo) {
+  if (!noteCountOf(dateKey, roomNo)) return '';
+  return `<button type="button" data-noteedit="${escapeHtml(roomNo)}" title="備註" aria-label="備註" style="background:#fff3bf;border:1px solid #f59f00;color:#a5570a;border-radius:8px;font-size:13px;font-weight:900;padding:0 6px;margin-left:4px;line-height:20px;vertical-align:middle">＊</button>`;
+}
+
+// 模式判斷看「全部房間」而非只看第一筆，避免混合資料整頁翻車
+function isOrderMode() { return state.rooms.some(r => r && 'infant' in r); }
 // 加購種類三選一
 const MEAL_TYPES = ['正常', '蛋奶', '全素'];
 let mealTypeChoice = '正常'; // 正常 | 蛋奶 | 全素
@@ -262,7 +275,7 @@ function render() {
   renderGrid(tk);
 }
 
-function isBreakfast8Mode() { return state.rooms.length && state.rooms[0] && 'adult' in state.rooms[0]; }
+function isBreakfast8Mode() { return state.rooms.some(r => r && 'adult' in r && !('infant' in r)); }
 let mealEditTarget = null;
 let mealEditMode = 'addon'; // addon | revert
 let mealPayChoice = '待付'; // 已付 | 待付
@@ -357,7 +370,7 @@ function renderOrderGrid(tk) {
     return `<tr data-room="${escapeHtml(r.roomNumber)}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? ';outline:2px solid #fcc419' : ''}${color ? ';border-bottom:5px solid ' + color + ';' : ''}">
       <td style="padding:8px 4px;font-weight:900">${color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.12)"></span>` : ''}${escapeHtml(r.roomNumber)}${r.guestName ? `<span title="${escapeHtml(r.guestName)}" style="font-size:11px;color:#868e96;margin-left:4px">(${escapeHtml(r.guestName.length > 5 ? r.guestName.slice(0,5) + '...' : r.guestName)})</span>` : ''}${yellowBadge}${payLine}</td>
       <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
-      <td style="font-size:11px">${[r.status, r.eggMilk, r.vegan].filter(Boolean).map(escapeHtml).join(' ')}${isAdd ? `<button data-orderrevert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${isNoAdd ? `<button data-orderaddon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}</td>
+      <td style="font-size:11px">${[r.status, r.eggMilk, r.vegan].filter(Boolean).map(escapeHtml).join(' ')}${isAdd ? `<button data-orderrevert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${isNoAdd ? `<button data-orderaddon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${noteStar(tk, r.roomNumber)}</td>
       <td style="text-align:center;font-weight:700">${escapeHtml(r.adult ?? '')}</td>
       <td style="text-align:center">${escapeHtml(kid || '')}</td>
       <td style="font-size:12px;color:${r.mealTime === '不用餐' ? '#868e96;font-style:italic' : 'inherit'}" data-timeset="${escapeHtml(r.roomNumber)}">${escapeHtml(r.mealTime || '')}${r.mealTime ? '' : '<span class="hint" style="color:#adb5bd">＋</span>'}<button data-orderedit="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:11px;padding:1px 6px">改</button></td>
@@ -409,6 +422,7 @@ function renderOrderGrid(tk) {
     if (e.target.closest('[data-orderaddon]')) return;
     if (e.target.closest('[data-orderrevert]')) return;
     if (e.target.closest('[data-timeset]')) return;
+    if (e.target.closest('[data-noteedit]')) return;
     const next = toggleStatus(tk, tr.dataset.room);
     if (navigator.vibrate) navigator.vibrate(next === STATUS.COMPLETED ? 20 : 8);
     toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
@@ -428,6 +442,10 @@ function renderOrderGrid(tk) {
   grid.querySelectorAll('[data-timeset]').forEach(td => td.addEventListener('click', (e) => {
     e.stopPropagation();
     openTimePicker(td.dataset.timeset);
+  }));
+  grid.querySelectorAll('[data-noteedit]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openNoteModal(btn.dataset.noteedit);
   }));
 }
 
@@ -475,7 +493,7 @@ function renderGrid(tk) {
       return `<tr data-room="${escapeHtml(r.roomNumber)}" class="${done ? 'row-done' : ''}" style="cursor:pointer;${done ? 'opacity:.45;background:#e7f5ff' : ''}${isAdd ? 'outline:2px solid #fcc419' : ''}${color ? ';border-bottom:5px solid ' + color + ';' : ''}">
         <td style="padding:8px 4px;font-weight:900">${color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.12)"></span>` : ''}${escapeHtml(r.roomNumber)}${r.guestName ? `<span title="${escapeHtml(r.guestName)}" style="font-size:11px;color:#868e96;margin-left:4px">(${escapeHtml(r.guestName.length > 5 ? r.guestName.slice(0,5) + '...' : r.guestName)})</span>` : ''}${yellowBadge}${payLine}</td>
         <td style="font-size:12px">${escapeHtml(r.source || '')}</td>
-        <td style="font-size:11px">${[r.status, r.eggMilk, r.vegan].filter(Boolean).map(escapeHtml).join(' ')}${isAdd ? `<button data-revert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${isNoAdd ? `<button data-addon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}</td>
+        <td style="font-size:11px">${[r.status, r.eggMilk, r.vegan].filter(Boolean).map(escapeHtml).join(' ')}${isAdd ? `<button data-revert="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff;border:1px solid #868e96;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${isNoAdd ? `<button data-addon="${escapeHtml(r.roomNumber)}" style="margin-left:4px;background:#fff3bf;border:1px solid #fcc419;border-radius:6px;font-size:10px;padding:1px 4px">改</button>` : ''}${noteStar(tk, r.roomNumber)}</td>
         <td style="text-align:center;font-weight:700">${escapeHtml(r.adult || '')}</td>
         <td style="text-align:center">${escapeHtml(r.child || '')}</td>
         <td style="font-size:12px;color:${r.mealTime === '不用餐' ? '#868e96;font-style:italic' : 'inherit'}" data-timeset="${escapeHtml(r.roomNumber)}">${escapeHtml(r.mealTime || '')}${r.mealTime ? '' : '<span class="hint" style="color:#adb5bd">＋</span>'}</td>
@@ -526,6 +544,7 @@ function renderGrid(tk) {
     grid.querySelectorAll('tr[data-room]').forEach(tr => tr.addEventListener('click', (e) => {
       if (e.target.closest('[data-addon]')) return; // 改按鈕不觸發切換
       if (e.target.closest('[data-timeset]')) return;
+      if (e.target.closest('[data-noteedit]')) return;
       const next = toggleStatus(tk, tr.dataset.room);
       if (navigator.vibrate) navigator.vibrate(next === STATUS.COMPLETED ? 20 : 8);
       toast(next === STATUS.COMPLETED ? `✅ ${tr.dataset.room} 已用餐` : `↩️ ${tr.dataset.room} 已取消`, 1200);
@@ -565,11 +584,16 @@ function renderGrid(tk) {
       e.stopPropagation();
       openTimePicker(td.dataset.timeset);
     }));
+    grid.querySelectorAll('[data-noteedit]').forEach(btn => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openNoteModal(btn.dataset.noteedit);
+    }));
     return;
   }
   // 切回卡片模式時恢復 grid 樣式
   grid.style.display = '';
   grid.style.gridTemplateColumns = '';
+  const rooms = filterRooms(tk, currentFilter);
   const html = rooms.map(r => {
     const st = getStatus(tk, r.roomNumber);
     const done = st === STATUS.COMPLETED;
@@ -578,7 +602,7 @@ function renderGrid(tk) {
     return `
       <div class="card ${isHot ? 'hot' : 'normal'} ${done ? 'completed' : 'pending'} ${(!done && isHot) ? 'hot-pending' : ''}" data-room="${escapeHtml(r.roomNumber)}">
         <button class="edit-btn" data-edit="${escapeHtml(r.roomNumber)}" aria-label="編輯">✎</button>
-        <div class="num">${escapeHtml(r.roomNumber)}</div>
+        <div class="num">${escapeHtml(r.roomNumber)}${noteStar(tk, r.roomNumber)}</div>
         <div><span class="type-badge">${info.emoji} ${info.label}</span></div>
         <div class="status-line">${done ? '✅ 已用餐' : '⏳ 尚未用餐'}</div>
       </div>`;
@@ -1180,11 +1204,13 @@ function confirmImport() {
     state.rooms = sortRooms(importDraft.rows.map(r => ({ roomNumber: r.roomNumber, breakfastType: r.breakfastType, orderId: r.orderId || '' })));
   }
   saveState();
-  render();
+  const imported = state.rooms.length;
+  // 先把視窗關掉再重畫：即使 render 出錯也不會卡在「視窗不關」的誤導狀態
   closeModal('importModal');
   importDraft = null;
   $('fileInput').value = '';
-  toast(`✅ 已匯入 ${state.rooms.length} 間房號`);
+  render();
+  toast(`✅ 已匯入 ${imported} 間房號`);
 }
 
 // ===== 備料區 =====
@@ -1368,6 +1394,8 @@ function bindEvents() {
   $('roomGrid').addEventListener('click', e => {
     const editBtn = e.target.closest('.edit-btn');
     if (editBtn) { e.stopPropagation(); openRoomModal(editBtn.dataset.edit); return; }
+    const noteBtn = e.target.closest('[data-noteedit]');
+    if (noteBtn) { e.stopPropagation(); openNoteModal(noteBtn.dataset.noteedit); return; }
     const card = e.target.closest('.card');
     if (!card) return;
     const next = toggleStatus(todayKey(), card.dataset.room);
@@ -1425,6 +1453,11 @@ function bindEvents() {
   // 時間選擇彈窗
   $('timePickerCloseBtn').addEventListener('click', () => { timePickerTarget = null; closeModal('timePickerModal'); });
 
+  // 房號備註
+  $('noteSaveBtn').addEventListener('click', saveNoteModal);
+  $('noteCancelBtn').addEventListener('click', () => { noteTarget = null; closeModal('noteModal'); });
+  $('menuClearNotesBtn').addEventListener('click', clearTodayNotes);
+
   // 備料區：比例更改即時重算並儲存
   $('prepModal').querySelectorAll('input[type="number"]').forEach(inp => {
     inp.addEventListener('change', collectPrep);
@@ -1452,6 +1485,8 @@ function bindEvents() {
         state.daily[tk][newNo] = state.daily[tk][room.roomNumber];
         delete state.daily[tk][room.roomNumber];
       }
+      // 備註與用餐紀錄一起搬，避免只搬一邊
+      state.notes = C.migrateNote(state.notes, tk, room.roomNumber, newNo);
       room.roomNumber = newNo;
       state.rooms = sortRooms(state.rooms);
     }
@@ -1646,6 +1681,46 @@ function openOrderTimePicker() {
     closeModal('timePickerModal');
   });
   openModal('timePickerModal');
+}
+
+// ===== 房號備註編輯 =====
+let noteTarget = null;
+function openNoteModal(roomNo) {
+  noteTarget = roomNo;
+  const tk = todayKey();
+  $('noteModalTitle').textContent = `房號 ${roomNo} 備註`;
+  $('noteEatenInput').value = getNote(tk, roomNo, 'eaten');
+  $('noteVegInput').value = getNote(tk, roomNo, 'veg');
+  openModal('noteModal');
+}
+function saveNoteModal() {
+  const tk = todayKey();
+  const roomNo = noteTarget;
+  if (!roomNo) { closeModal('noteModal'); return; }
+  const rawEaten = $('noteEatenInput').value;
+  const rawVeg = $('noteVegInput').value;
+  const tooLong = rawEaten.trim().length > C.NOTE_MAX || rawVeg.trim().length > C.NOTE_MAX;
+  setNote(tk, roomNo, 'eaten', rawEaten);
+  setNote(tk, roomNo, 'veg', rawVeg);
+  saveState();
+  render();
+  closeModal('noteModal');
+  noteTarget = null;
+  toast(tooLong ? `✅ ${roomNo} 備註已存（超過 ${C.NOTE_MAX} 字部分已截斷）` : `✅ ${roomNo} 備註已存`);
+}
+function countNotesToday() {
+  const tk = todayKey();
+  return state.rooms.filter(r => noteCountOf(tk, r.roomNumber)).length;
+}
+function clearTodayNotes() {
+  const n = countNotesToday();
+  if (!n) { toast('今日沒有備註'); return; }
+  if (!confirm(`確定清除今日 ${n} 間房號的備註嗎？\n（用餐紀錄不受影響）`)) return;
+  state.notes = C.clearNotesForDate(state.notes, todayKey());
+  saveState();
+  closeModal('menuModal');
+  render();
+  toast(`🗑️ 已清除今日備註`);
 }
 
 function openRoomModal(roomNo) {
