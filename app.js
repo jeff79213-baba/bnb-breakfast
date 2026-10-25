@@ -114,6 +114,41 @@ function sanitizeRooms(rooms) {
   return sortRooms(out);
 }
 
+// ===== 版本紀錄（改版時同步更新 APP_VERSION、CHANGELOG、sw.js 的 CACHE_NAME）=====
+const APP_VERSION = 'v23';
+const CHANGELOG = [
+  { v: 'v23', date: '2026-10-26', items: [
+    '修復：手動新增房號或匯入後「按了沒反應、畫面一片空白」（卡片模式當機）',
+    '修復：匯入多間後再手動加房，整頁變空、已匯入的房號看似消失',
+    '新增：房號備註 ＊（可寫「已用餐幾人」與「素食／蛋奶素備註」），卡片與兩欄表格都能用',
+    '新增：功能選單「清今日備註」',
+    '新增：畫面層自動測試，防止同類當機再次發生'
+  ] },
+  { v: 'v22', date: '2026-10-18', items: ['訂單模式分組配色改依房號順序，切換排序時同組顏色不再變動'] },
+  { v: 'v21', date: '2026-10-18', items: ['新增：訂單模式「用餐時間」排序'] },
+  { v: 'v20', date: '2026-10-03', items: ['新增：清空房號（保留備料設定與用餐紀錄）'] },
+  { v: 'v19', date: '2026-09-26', items: ['新增：熟食警示橫幅第二行顯示大人／小孩人數'] },
+  { v: 'v18', date: '2026-09-24', items: ['新增：訂單模式可依房客姓名排序'] },
+  { v: 'v17', date: '2026-09-20', items: ['修正：平台房改為加購後，正確併入熟食並計入未用餐'] },
+  { v: 'v14–v16', date: '2026-08~09', items: ['兩欄表合併為 7 欄、蛇形連續排列、備註欄與顧客名顯示'] },
+  { v: 'v7–v13', date: '2026-08', items: ['新訂單格式匯入、用餐時段滾輪、備料區、熟食警示橫幅、空位填滿畫面'] },
+  { v: 'v1–v6', date: '—', items: ['初期建置：房號卡片、熱食／一般分類、每日用餐紀錄、PWA 離線可用'] }
+];
+function openVersionModal() {
+  $('versionCurrent').textContent = APP_VERSION;
+  $('versionList').innerHTML = CHANGELOG.map(e => `
+    <div style="border-left:3px solid #dee2e6;padding:0 0 0 10px;margin:0 0 14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <b style="font-size:16px">${escapeHtml(e.v)}</b>
+        <span class="hint" style="font-size:12px">${escapeHtml(e.date)}</span>
+      </div>
+      <ul style="margin:6px 0 0;padding-left:18px;font-size:14px;line-height:1.6">
+        ${e.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+  openModal('versionModal');
+}
+
 // ===== 工具 =====
 function todayKey(d = new Date()) {
   const y = d.getFullYear();
@@ -173,10 +208,15 @@ function toggleStatus(dateKey, roomNumber) {
 function getNote(dateKey, roomNo, field) { return C.noteGet(state.notes, dateKey, roomNo, field); }
 function setNote(dateKey, roomNo, field, value) { state.notes = C.noteSet(state.notes, dateKey, roomNo, field, value); }
 function noteCountOf(dateKey, roomNo) { return C.noteCount(state.notes, dateKey, roomNo); }
-// 有備註才顯示 ＊；兩條都有也只顯示一顆（避免觸控點擠在一起）
+// ＊ 永遠可見：沒備註時是淡灰（新增入口），有備註時變金色
 function noteStar(dateKey, roomNo) {
-  if (!noteCountOf(dateKey, roomNo)) return '';
-  return `<button type="button" data-noteedit="${escapeHtml(roomNo)}" title="備註" aria-label="備註" style="background:#fff3bf;border:1px solid #f59f00;color:#a5570a;border-radius:8px;font-size:13px;font-weight:900;padding:0 6px;margin-left:4px;line-height:20px;vertical-align:middle">＊</button>`;
+  const n = noteCountOf(dateKey, roomNo);
+  const has = n > 0;
+  const bg = has ? '#fff3bf' : 'transparent';
+  const bd = has ? '#f59f00' : '#ced4da';
+  const fg = has ? '#a5570a' : '#adb5bd';
+  const title = has ? `有備註（${n} 則）` : '新增備註（已用餐幾人／素食）';
+  return `<button type="button" data-noteedit="${escapeHtml(roomNo)}" title="${title}" aria-label="備註" style="background:${bg};border:1px solid ${bd};color:${fg};border-radius:8px;font-size:13px;font-weight:900;padding:0 6px;margin-left:4px;line-height:20px;vertical-align:middle">＊</button>`;
 }
 
 // 模式判斷看「全部房間」而非只看第一筆，避免混合資料整頁翻車
@@ -1458,6 +1498,10 @@ function bindEvents() {
   $('noteCancelBtn').addEventListener('click', () => { noteTarget = null; closeModal('noteModal'); });
   $('menuClearNotesBtn').addEventListener('click', clearTodayNotes);
 
+  // 版本紀錄
+  $('menuVersionBtn').addEventListener('click', () => { closeModal('menuModal'); openVersionModal(); });
+  $('versionCloseBtn').addEventListener('click', () => closeModal('versionModal'));
+
   // 備料區：比例更改即時重算並儲存
   $('prepModal').querySelectorAll('input[type="number"]').forEach(inp => {
     inp.addEventListener('change', collectPrep);
@@ -1743,4 +1787,5 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 // ===== 啟動 =====
 state = loadState();
 bindEvents();
+$('menuVersionTag').textContent = APP_VERSION;
 render();

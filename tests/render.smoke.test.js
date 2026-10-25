@@ -75,7 +75,8 @@ function bootApp() {
   setState(s) { state = s; },
   render, renderGrid, filterRooms, todayKey,
   isOrderMode, isBreakfast8Mode, noteStar,
-  openNoteModal, saveNoteModal, getNote, countNotesToday, clearTodayNotes
+  openNoteModal, saveNoteModal, getNote, countNotesToday, clearTodayNotes,
+  openVersionModal, APP_VERSION, CHANGELOG
 };
 `;
   vm.runInContext(appSrc, sandbox, { filename: 'app.js' });
@@ -114,17 +115,19 @@ test('卡片模式：renderGrid 直接呼叫也正常（filterRooms 已接回）
   assert.ok(grid.innerHTML.includes('102'));
 });
 
-test('卡片模式：有備註才出現 ＊（data-noteedit），無備註完全不佔空間', () => {
+test('卡片模式：＊ 永遠可見（新增入口），有備註時才變金色', () => {
   P.setState(mkState([{ roomNumber: '101', breakfastType: 'normal' }]));
   P.render();
-  assert.ok(!grid.innerHTML.includes('data-noteedit'), '無備註不該有 ＊');
+  assert.ok(grid.innerHTML.includes('data-noteedit'), '無備註也要有 ＊ 當入口');
+  assert.ok(!grid.innerHTML.includes('#fff3bf'), '無備註時不該是金色底');
 
   P.setState(mkState(
     [{ roomNumber: '101', breakfastType: 'normal' }],
     { [tk]: { '101': { veg: '1人全素' } } }
   ));
   P.render();
-  assert.ok(grid.innerHTML.includes('data-noteedit'), '有備註應出現 ＊');
+  assert.ok(grid.innerHTML.includes('data-noteedit'), '有備註仍有 ＊');
+  assert.ok(grid.innerHTML.includes('#fff3bf'), '有備註應變金色底');
 });
 
 test('8 欄模式：兩欄表格 render 正常', () => {
@@ -171,8 +174,27 @@ test('noteModal 來回：開窗讀空、存檔寫入 notes、＊ 隨之出現', 
   assert.ok(grid.innerHTML.includes('data-noteedit'));
 });
 
-test('清空今日備註：notes 歸零、＊ 消失', () => {
+test('清空今日備註：notes 歸零、＊ 由金色退回淡灰', () => {
   P.clearTodayNotes();
   assert.strictEqual(P.countNotesToday(), 0);
-  assert.ok(!grid.innerHTML.includes('data-noteedit'));
+  assert.ok(grid.innerHTML.includes('data-noteedit'), '＊ 仍在（當入口）');
+  assert.ok(!grid.innerHTML.includes('#fff3bf'), '金色底應消失');
+});
+
+test('版本紀錄：目前版本與清單都畫得出來，最新版在最上面', () => {
+  assert.doesNotThrow(() => P.openVersionModal());
+  assert.strictEqual(els['versionCurrent'].textContent, P.APP_VERSION, '應顯示目前版本');
+  const list = els['versionList'].innerHTML;
+  assert.ok(list.includes(P.APP_VERSION), '清單應含目前版本');
+  assert.ok(list.includes('v22'), '清單應含歷史版本');
+  assert.ok(list.indexOf(P.APP_VERSION) < list.indexOf('v22'), '最新版應排最前面');
+});
+
+test('三種畫面都有 ＊ 入口（資料層測試）', () => {
+  P.setState(mkState([{ roomNumber: '201', source: '官網', adult: 2, child: 1, mealTime: '', breakfastType: 'hot' }]));
+  P.render();
+  assert.ok(grid.innerHTML.includes('data-noteedit'), '8 欄模式要有 ＊');
+  P.setState(mkState([{ roomNumber: '301', source: '手動訂單', adult: 1, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A1' }]));
+  P.render();
+  assert.ok(grid.innerHTML.includes('data-noteedit'), '新訂單模式要有 ＊');
 });

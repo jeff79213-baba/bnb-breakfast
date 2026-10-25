@@ -102,6 +102,7 @@
     <button class="btn list-btn" id="menuPrepBtn">🧮 備料區</button>
     <button class="btn list-btn" id="menuSlotsBtn">🍳 早餐用餐時間</button>
     <button class="btn list-btn" id="menuExportBtn">📤 匯出今日紀錄</button>
+    <button class="btn list-btn" id="menuVersionBtn">📋 版本紀錄 <span class="hint" id="menuVersionTag" style="font-weight:400"></span></button>
     <button class="btn list-btn subtle" id="menuCloseBtn">關閉</button>
   </div>
 </div>
@@ -322,6 +323,16 @@
       <button class="btn" id="noteCancelBtn">取消</button>
       <button class="btn primary" id="noteSaveBtn">存檔</button>
     </div>
+  </div>
+</div>
+
+<!-- 版本紀錄 -->
+<div class="modal-backdrop hidden" id="versionModal">
+  <div class="sheet tall">
+    <div class="sheet-handle"></div>
+    <h2>📋 版本紀錄　<span class="hint" style="font-size:14px;font-weight:400">目前版本 <b id="versionCurrent">v23</b></span></h2>
+    <div id="versionList" style="margin-top:12px;overflow:auto"></div>
+    <button class="btn subtle full" id="versionCloseBtn">關閉</button>
   </div>
 </div>
 
