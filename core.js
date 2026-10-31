@@ -355,6 +355,11 @@
     if (adult != null) patch.adult = adult;
     if (child != null) patch.child = child;
     if (infant != null) patch.infant = infant;
+    // 訂單模式把「幾小」視為小孩總數：講了小孩就清嬰幼兒、講了嬰幼兒就清小孩
+    if ('infant' in room) {
+      if (child != null && infant == null) patch.infant = 0;
+      if (infant != null && child == null) patch.child = 0;
+    }
     if (addon === false) {
       patch.eggMilk = '';
       patch.vegan = '不加購';

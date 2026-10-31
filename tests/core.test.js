@@ -398,6 +398,14 @@ test('parseRoomCommand: 中文數字（二大一小）', () => {
   assert.strictEqual(r.patch.child, 1);
 });
 
+test('parseRoomCommand: 講「幾小」視為小孩總數，會清掉嬰幼兒', () => {
+  const rooms = [{ roomNumber: '201', source: '官網', adult: 2, child: 0, infant: 2, eggMilk: '', vegan: '', mealTime: '', breakfastType: 'hot' }];
+  const r = C.parseRoomCommand('201 2大1小', rooms);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.patch.child, 1);
+  assert.strictEqual(r.patch.infant, 0);
+});
+
 test('parseRoomCommand: 不加購（8欄房會清掉人數）', () => {
   const rooms = [{ roomNumber: '301', source: '官網', adult: '2', child: '1', eggMilk: '', vegan: '', mealTime: '', breakfastType: 'normal' }];
   const r = C.parseRoomCommand('301 不加購', rooms);
