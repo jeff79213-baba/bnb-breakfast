@@ -77,7 +77,10 @@ function bootApp() {
   isOrderMode, isBreakfast8Mode, noteStar,
   openNoteModal, saveNoteModal, getNote, countNotesToday, clearTodayNotes,
   openVersionModal, APP_VERSION, CHANGELOG,
-  openLastImport, makeImportSnapshot
+  openLastImport, makeImportSnapshot,
+  openCmdModal, parseCmdInput, applyCmdDraft,
+  getCmdDraft: () => cmdDraft,
+  getState: () => state
 };
 `;
   vm.runInContext(appSrc, sandbox, { filename: 'app.js' });
@@ -189,6 +192,55 @@ test('查看匯入資料：8 欄快照顯示欄位與原始 B~H', () => {
   assert.ok(list.includes('續住'));
   assert.ok(list.includes('續住｜不｜加｜購｜08:00'), '應顯示原始 B~H 欄位');
   assert.ok(els['lastImportIssues'].innerHTML.includes('第 9 列'));
+});
+
+test('文字指令：批次解析後顯示確認表，確認才套用', () => {
+  P.setState(mkState([
+    { roomNumber: '201', source: '官網', adult: 1, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A1' },
+    { roomNumber: '202', source: '官網', adult: 2, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A2' },
+  ]));
+  P.openCmdModal();
+  els['cmdInput'].value = '201 2大1小 加購 蛋奶\n202 不用餐';
+  P.parseCmdInput();
+  const draft = P.getCmdDraft();
+  assert.ok(Array.isArray(draft) && draft.length === 2, '應解析出兩間房');
+  assert.ok(els['cmdResult'].innerHTML.includes('201'));
+  assert.ok(els['cmdResult'].innerHTML.includes('202'));
+  assert.ok(els['cmdResult'].innerHTML.includes('大人 1 → <b>2</b>'), '確認表要顯示變更前後');
+  P.applyCmdDraft();
+  const s = P.getState();
+  assert.strictEqual(s.rooms.find(r => r.roomNumber === '201').adult, 2);
+  assert.strictEqual(s.rooms.find(r => r.roomNumber === '201').child, 1);
+  assert.strictEqual(s.rooms.find(r => r.roomNumber === '201').eggMilk, '蛋奶加購');
+  assert.strictEqual(s.rooms.find(r => r.roomNumber === '202').mealTime, '不用餐');
+});
+
+test('文字指令：有任何一行看不懂就整批不套用', () => {
+  P.setState(mkState([
+    { roomNumber: '201', source: '官網', adult: 1, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A1' },
+  ]));
+  P.openCmdModal();
+  els['cmdInput'].value = '201 2大1小\n999 不用餐';
+  P.parseCmdInput();
+  assert.strictEqual(P.getCmdDraft(), null, '不應產生待套用清單');
+  assert.ok(els['cmdResult'].innerHTML.includes('無法處理'));
+  assert.ok(els['cmdResult'].innerHTML.includes('999'));
+  assert.strictEqual(P.getState().rooms.find(r => r.roomNumber === '201').adult, 1, '原資料不能被改');
+});
+
+test('文字指令：已吃／未吃會寫入今日用餐狀態', () => {
+  P.setState(mkState([
+    { roomNumber: '201', source: '官網', adult: 1, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A1' },
+    { roomNumber: '202', source: '官網', adult: 2, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A2' },
+  ]));
+  P.openCmdModal();
+  els['cmdInput'].value = '201 已吃\n202 未用餐';
+  P.parseCmdInput();
+  assert.strictEqual(P.getCmdDraft().length, 2);
+  P.applyCmdDraft();
+  const s = P.getState();
+  assert.strictEqual(s.daily[tk]['201'], 'completed');
+  assert.strictEqual(s.daily[tk]['202'], 'pending');
 });
 
 test('混合資料（37 間新訂單 + 手動加 101）：some 判斷不讓整頁掉回卡片', () => {

@@ -363,6 +363,109 @@ test('sortRoomsPendingFirst: 不修改原陣列、空輸入回傳 []', () => {
   assert.deepStrictEqual(C.sortRoomsPendingFirst(undefined), []);
 });
 
+// ===== 批次文字指令 =====
+
+const CMD_ROOMS = [
+  { roomNumber: '201', source: '官網', adult: 1, child: 0, infant: 0, eggMilk: '', vegan: '', mealTime: '', breakfastType: 'hot' },
+  { roomNumber: '202', source: '官網', adult: 2, child: 1, infant: 0, eggMilk: '蛋奶加購', vegan: '', mealTime: '', breakfastType: 'hot' },
+  { roomNumber: '203', source: '官網', adult: 2, child: 0, infant: 0, eggMilk: '', vegan: '不加購', mealTime: '', breakfastType: 'normal' },
+  { roomNumber: '204', source: '官網', adult: 2, child: 0, infant: 0, eggMilk: '', vegan: '', mealTime: '不用餐', breakfastType: 'normal' },
+];
+
+test('parseRoomCommand: 順序不限，抓房號／人數／加購／蛋奶', () => {
+  const r = C.parseRoomCommand('加購 蛋奶 2大1小 201', CMD_ROOMS);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.roomNumber, '201');
+  assert.strictEqual(r.patch.adult, 2);
+  assert.strictEqual(r.patch.child, 1);
+  assert.strictEqual(r.patch.eggMilk, '蛋奶加購');
+  assert.strictEqual(r.patch.vegan, '');
+  assert.ok(r.changes.some(c => c.label === '大人' && c.to === '2'));
+  assert.ok(r.changes.some(c => c.label === '餐點'));
+});
+
+test('parseRoomCommand: 全素會自動視為加購', () => {
+  const r = C.parseRoomCommand('201 全素 1大', CMD_ROOMS);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.patch.eggMilk, '全素加購');
+  assert.strictEqual(r.patch.adult, 1);
+});
+
+test('parseRoomCommand: 中文數字（二大一小）', () => {
+  const r = C.parseRoomCommand('201 二大一小 加購', CMD_ROOMS);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.patch.adult, 2);
+  assert.strictEqual(r.patch.child, 1);
+});
+
+test('parseRoomCommand: 不加購（8欄房會清掉人數）', () => {
+  const rooms = [{ roomNumber: '301', source: '官網', adult: '2', child: '1', eggMilk: '', vegan: '', mealTime: '', breakfastType: 'normal' }];
+  const r = C.parseRoomCommand('301 不加購', rooms);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.patch.vegan, '不加購');
+  assert.strictEqual(r.patch.adult, '');
+  assert.strictEqual(r.patch.child, '');
+});
+
+test('parseRoomCommand: 不用餐與恢復用餐', () => {
+  const a = C.parseRoomCommand('202 不用餐', CMD_ROOMS);
+  assert.strictEqual(a.ok, true);
+  assert.strictEqual(a.patch.mealTime, '不用餐');
+  const b = C.parseRoomCommand('204 要用餐', CMD_ROOMS);
+  assert.strictEqual(b.ok, true);
+  assert.strictEqual(b.patch.mealTime, '');
+});
+
+test('parseRoomCommand: 時間支援 8:30／8點半／08:30', () => {
+  for (const text of ['201 8:30', '201 8點半', '201 08:30']) {
+    const r = C.parseRoomCommand(text, CMD_ROOMS);
+    assert.strictEqual(r.ok, true, text);
+    assert.strictEqual(r.patch.mealTime, '08:30', text);
+  }
+});
+
+test('parseRoomCommand: 已吃／未吃寫入用餐狀態', () => {
+  assert.strictEqual(C.parseRoomCommand('201 已吃', CMD_ROOMS).dailyStatus, 'completed');
+  assert.strictEqual(C.parseRoomCommand('201 未用餐', CMD_ROOMS).dailyStatus, 'pending');
+});
+
+test('parseRoomCommand: 房號不存在／找不到房號／沒有動作都要擋下', () => {
+  assert.strictEqual(C.parseRoomCommand('999 2大1小', CMD_ROOMS).ok, false);
+  assert.strictEqual(C.parseRoomCommand('2大1小 加購', CMD_ROOMS).ok, false);
+  assert.strictEqual(C.parseRoomCommand('201', CMD_ROOMS).ok, false);
+});
+
+test('parseRoomCommand: 衝突指令要擋下', () => {
+  assert.strictEqual(C.parseRoomCommand('201 加購 不加購', CMD_ROOMS).ok, false);
+  assert.strictEqual(C.parseRoomCommand('201 不用餐 08:30', CMD_ROOMS).ok, false);
+  assert.strictEqual(C.parseRoomCommand('201 不用餐 加購', CMD_ROOMS).ok, false);
+  assert.strictEqual(C.parseRoomCommand('201 已吃 未吃', CMD_ROOMS).ok, false);
+  assert.strictEqual(C.parseRoomCommand('201 全素 蛋奶', CMD_ROOMS).ok, false);
+});
+
+test('parseRoomCommand: 舊格式房不能改人數／餐點', () => {
+  const rooms = [{ roomNumber: '101', breakfastType: 'normal' }];
+  const r = C.parseRoomCommand('101 2大1小 加購', rooms);
+  assert.strictEqual(r.ok, false);
+  assert.ok(r.errors.some(e => e.includes('舊格式')));
+});
+
+test('splitRoomCommands: 換行、分號、連續多房都能拆', () => {
+  assert.deepStrictEqual(
+    C.splitRoomCommands('201 2大1小\n202 不用餐；203 08:30'),
+    ['201 2大1小', '202 不用餐', '203 08:30']
+  );
+  assert.deepStrictEqual(
+    C.splitRoomCommands('201 2大1小 202 不用餐 203 08:30'),
+    ['201 2大1小', '202 不用餐', '203 08:30']
+  );
+});
+
+test('splitRoomCommands: 空字串回空陣列', () => {
+  assert.deepStrictEqual(C.splitRoomCommands(''), []);
+  assert.deepStrictEqual(C.splitRoomCommands(null), []);
+});
+
 // ===== 房號備註 =====
 
 test('noteGet: 缺值一律回空字串', () => {

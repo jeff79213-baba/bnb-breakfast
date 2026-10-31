@@ -17,6 +17,7 @@ const STATUS = { PENDING: 'pending', COMPLETED: 'completed' };
 let state = null;
 let currentFilter = 'all';       // all | hot | normal | pending | completed | hot-pending
 let importDraft = null;          // 匯入預覽暫存
+let cmdDraft = null;             // 文字指令解析後的待套用清單
 let roomModalTarget = null;      // 編輯中的房號
 
 const $ = (id) => document.getElementById(id);
@@ -128,8 +129,13 @@ function sanitizeRooms(rooms) {
 }
 
 // ===== 版本紀錄（改版時同步更新 APP_VERSION、CHANGELOG、sw.js 的 CACHE_NAME）=====
-const APP_VERSION = 'v26';
+const APP_VERSION = 'v27';
 const CHANGELOG = [
+  { v: 'v27', date: '2026-10-31', items: [
+    '新增：功能選單「文字指令」——一次輸入多行，一行一間房，順序不限',
+    '支援：幾大幾小、加購／不加購、全素／蛋奶、不用餐／要用餐、用餐時間、已吃／未吃',
+    '送出後先顯示確認表，確認無誤才一次套用；有任何看不懂的整批不套用'
+  ] },
   { v: 'v26', date: '2026-10-31', items: [
     '新增：訂單模式排序「尚未用餐」（未用餐排前面，已用餐排後面）',
     '新增：功能選單「查看匯入資料」——可核對最近一次上傳的欄位內容與匯入提示'
@@ -1314,6 +1320,88 @@ function openLastImport() {
   openModal('lastImportModal');
 }
 
+function openCmdModal() {
+  closeModal('menuModal');
+  resetCmdPreview();
+  $('cmdResult').innerHTML = '';
+  openModal('cmdModal');
+  setTimeout(() => { const el = $('cmdInput'); if (el && typeof el.focus === 'function') el.focus(); }, 50);
+}
+
+function resetCmdPreview() {
+  cmdDraft = null;
+  $('cmdResult').classList.add('hidden');
+  $('cmdApplyRow').classList.add('hidden');
+}
+
+function parseCmdInput() {
+  const text = String($('cmdInput').value || '').trim();
+  if (!text) { toast('請先輸入文字指令'); return; }
+  const lines = C.splitRoomCommands(text);
+  if (!lines.length) { toast('請先輸入文字指令'); return; }
+  const tk = todayKey();
+  const ops = lines.map(line => {
+    const op = C.parseRoomCommand(line, state.rooms);
+    if (op.ok && op.dailyStatus) {
+      const before = getStatus(tk, op.roomNumber);
+      if (before !== op.dailyStatus) {
+        op.changes.push({
+          label: '用餐狀態',
+          from: before === STATUS.COMPLETED ? '已用餐' : '未用餐',
+          to: op.dailyStatus === STATUS.COMPLETED ? '已用餐' : '未用餐'
+        });
+      }
+    }
+    return op;
+  });
+  const bad = ops.filter(o => !o.ok);
+  if (bad.length) {
+    cmdDraft = null;
+    $('cmdApplyRow').classList.add('hidden');
+    $('cmdResult').innerHTML = `<div class="hint" style="margin-bottom:8px">有 <b>${bad.length}</b> 筆無法處理，請修正後再按「解析並預覽」。</div>`
+      + bad.map(o => {
+        const idx = ops.indexOf(o) + 1;
+        return `<div class="issue"><b>第 ${idx} 筆</b>：${escapeHtml(o.line)}<br>${o.errors.map(e => '❌ ' + escapeHtml(e)).join('<br>')}</div>`;
+      }).join('');
+    $('cmdResult').classList.remove('hidden');
+    return;
+  }
+  cmdDraft = ops;
+  const rows = ops.map(o => {
+    const changes = o.changes.length
+      ? o.changes.map(c => `${escapeHtml(c.label)} ${escapeHtml(c.from)} → <b>${escapeHtml(c.to)}</b>`).join('<br>')
+      : '無變更';
+    return `<tr><td><b>${escapeHtml(o.roomNumber)}</b></td><td class="cmd-change">${changes}</td></tr>`;
+  }).join('');
+  $('cmdResult').innerHTML = `<div class="hint" style="margin-bottom:8px">共 <b>${ops.length}</b> 間房，確認無誤後按「確認套用」。</div>`
+    + `<table class="cmd-table"><thead><tr><th>房號</th><th>變更內容</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('cmdResult').classList.remove('hidden');
+  $('cmdApplyRow').classList.remove('hidden');
+}
+
+function applyCmdDraft() {
+  if (!cmdDraft || !cmdDraft.length) return;
+  const tk = todayKey();
+  for (const op of cmdDraft) {
+    const room = state.rooms.find(r => r.roomNumber === op.roomNumber);
+    if (!room) { toast(`❌ 房號 ${op.roomNumber} 已不存在，請重新解析`); return; }
+    Object.assign(room, op.patch);
+    if (op.dailyStatus) {
+      if (!state.daily[tk]) state.daily[tk] = {};
+      state.daily[tk][op.roomNumber] = op.dailyStatus;
+    }
+  }
+  const n = cmdDraft.length;
+  cmdDraft = null;
+  $('cmdResult').classList.add('hidden');
+  $('cmdApplyRow').classList.add('hidden');
+  $('cmdInput').value = '';
+  saveState();
+  closeModal('cmdModal');
+  render();
+  toast(`✅ 已套用 ${n} 間房`);
+}
+
 function confirmImport() {
   if (!importDraft) return;
   if (importDraft.isOrder) {
@@ -1569,6 +1657,17 @@ function bindEvents() {
   $('menuImportBtn').addEventListener('click', () => { closeModal('menuModal'); $('fileInput').click(); });
   $('menuLastImportBtn').addEventListener('click', openLastImport);
   $('lastImportCloseBtn').addEventListener('click', () => closeModal('lastImportModal'));
+  $('menuCmdBtn').addEventListener('click', openCmdModal);
+  $('cmdCloseBtn').addEventListener('click', () => closeModal('cmdModal'));
+  $('cmdParseBtn').addEventListener('click', parseCmdInput);
+  $('cmdApplyBtn').addEventListener('click', applyCmdDraft);
+  $('cmdClearBtn').addEventListener('click', () => { $('cmdInput').value = ''; resetCmdPreview(); });
+  $('cmdBackBtn').addEventListener('click', () => {
+    resetCmdPreview();
+    const el = $('cmdInput');
+    if (el && typeof el.focus === 'function') el.focus();
+  });
+  $('cmdInput').addEventListener('input', resetCmdPreview);
   $('menuClearBtn').addEventListener('click', () => { closeModal('menuModal'); openClearConfirm(); });
   $('clearCancelBtn').addEventListener('click', () => closeModal('clearModal'));
   $('clearConfirmBtn').addEventListener('click', doClearRooms);
