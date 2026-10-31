@@ -178,6 +178,19 @@
     return rooms;
   }
 
+  // 尚未用餐優先：未完成者在前、已完成者在後，同組內依房號
+  function sortRoomsPendingFirst(list, isDone) {
+    const rooms = (list || []).slice();
+    const done = typeof isDone === 'function' ? isDone : () => false;
+    rooms.sort((x, y) => {
+      const dx = done(x) ? 1 : 0;
+      const dy = done(y) ? 1 : 0;
+      if (dx !== dy) return dx - dy;
+      return roomNumberCmp(roomKeyOf(x), roomKeyOf(y));
+    });
+    return rooms;
+  }
+
   // 清空房號清單；settings（備料比例等）與 daily（用餐紀錄）原樣保留
   function clearRooms(state) {
     return Object.assign({}, state, { rooms: [] });
@@ -267,7 +280,7 @@
     HOT_SOURCES, isHotSource, isNoAdd, isAddon, isHotRoom, isPlatformRoom,
     isNoMeal, computeHotPending, computeHotPeople, computeStats, normalizeSlots,
     addSlot, enabledSlots, sortSlots, timeOf, groupKeyOf, assignGroupColors,
-    sortRoomsGrouped, sortRoomsByMealTime, clearRooms,
+    sortRoomsGrouped, sortRoomsByMealTime, sortRoomsPendingFirst, clearRooms,
     NOTE_FIELDS, NOTE_MAX, noteGet, noteSet, noteCount, migrateNote,
     clearNotesForDate, sanitizeNotes
   };

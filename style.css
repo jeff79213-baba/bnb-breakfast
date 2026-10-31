@@ -363,6 +363,27 @@ main { max-width: 900px; margin: 0 auto; padding: 12px 12px calc(32px + env(safe
   padding: 8px 12px;
   border-bottom: 1px solid #f1f3f5;
 }
+.last-import-wrap {
+  max-height: 52vh; overflow: auto;
+  border: 2px solid #e9ecef; border-radius: 12px;
+  margin-top: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.last-import-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px; white-space: nowrap;
+}
+.last-import-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: #f8f9fa; color: var(--muted);
+  font-size: 12px; text-align: left;
+  padding: 8px 10px; border-bottom: 2px solid #e9ecef;
+}
+.last-import-table td {
+  padding: 7px 10px; border-bottom: 1px solid #f1f3f5;
+}
+.last-import-table tr:last-child td { border-bottom: none; }
+.last-import-table .raw-cell { color: var(--muted); font-size: 11px; }
 .hint { font-size: 13px; color: var(--muted); }
 
 /* ===== Toast ===== */

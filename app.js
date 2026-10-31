@@ -55,7 +55,19 @@ function defaultState() {
     },
     rooms: [],        // [{ roomNumber:'101', breakfastType:'hot' }]
     daily: {},        // { '2026-08-23': { '101':'completed' } } 未記錄者視為 pending
-    notes: {}         // { '2026-08-23': { '101': { eaten:'1大已吃', veg:'1人全素' } } }
+    notes: {},        // { '2026-08-23': { '101': { eaten:'1大已吃', veg:'1人全素' } } }
+    lastImport: null  // 最近一次匯入的原始欄位快照（供核對）
+  };
+}
+
+function sanitizeLastImport(v) {
+  if (!v || typeof v !== 'object' || !Array.isArray(v.rows)) return null;
+  const kind = ['order', 'breakfast8', 'simple'].includes(v.kind) ? v.kind : 'simple';
+  return {
+    at: typeof v.at === 'string' ? v.at : '',
+    kind,
+    rows: v.rows.filter(r => r && typeof r === 'object').slice(0, 1000),
+    issues: Array.isArray(v.issues) ? v.issues.map(x => String(x)).slice(0, 100) : []
   };
 }
 
@@ -72,11 +84,12 @@ function loadState() {
         types: Array.isArray(data.settings?.types) && data.settings.types.length ? data.settings.types : base.settings.types,
         prep: Object.assign({}, DEFAULT_PREP, (data.settings && data.settings.prep) || {}),
         mealSlots: C ? C.sortSlots(Array.isArray(data.settings?.mealSlots) ? data.settings.mealSlots : []) : [],
-        sortMode: (data.settings && ['name', 'time'].includes(data.settings.sortMode)) ? data.settings.sortMode : 'room'
+        sortMode: (data.settings && ['name', 'time', 'pending'].includes(data.settings.sortMode)) ? data.settings.sortMode : 'room'
       },
       rooms: Array.isArray(data.rooms) ? sanitizeRooms(data.rooms) : [],
       daily: (data.daily && typeof data.daily === 'object') ? data.daily : {},
-      notes: C ? C.sanitizeNotes(data.notes) : {}
+      notes: C ? C.sanitizeNotes(data.notes) : {},
+      lastImport: sanitizeLastImport(data.lastImport)
     };
   } catch (e) {
     console.error('資料載入失敗', e);
@@ -115,8 +128,12 @@ function sanitizeRooms(rooms) {
 }
 
 // ===== 版本紀錄（改版時同步更新 APP_VERSION、CHANGELOG、sw.js 的 CACHE_NAME）=====
-const APP_VERSION = 'v25';
+const APP_VERSION = 'v26';
 const CHANGELOG = [
+  { v: 'v26', date: '2026-10-31', items: [
+    '新增：訂單模式排序「尚未用餐」（未用餐排前面，已用餐排後面）',
+    '新增：功能選單「查看匯入資料」——可核對最近一次上傳的欄位內容與匯入提示'
+  ] },
   { v: 'v25', date: '2026-10-26', items: [
     '修復：手動新增房號或匯入後「按了沒反應、畫面一片空白」（卡片模式當機）',
     '修復：匯入多間後再手動加房，整頁變空、已匯入的房號看似消失',
@@ -398,6 +415,7 @@ function renderOrderGrid(tk) {
   let all = byRoom;
   if (state.settings.sortMode === 'name') all = C.sortRoomsGrouped(byRoom);
   else if (state.settings.sortMode === 'time') all = C.sortRoomsByMealTime(byRoom);
+  else if (state.settings.sortMode === 'pending') all = C.sortRoomsPendingFirst(byRoom, r => getStatus(tk, r.roomNumber) === STATUS.COMPLETED);
   const colors = C.assignGroupColors(byRoom, ORDER_PALETTE);
   const hotList = all.filter(C.isHotRoom);
   const normalList = all.filter(r => C.isPlatformRoom(r));
@@ -1227,6 +1245,75 @@ function handleFile(file) {
   }).catch(() => toast('❌ 檔案讀取失敗'));
 }
 
+function makeImportSnapshot(draft) {
+  const rows = draft.rows || [];
+  const kind = draft.isOrder ? 'order' : draft.isBreakfast8 ? 'breakfast8' : 'simple';
+  const slim = rows.map(r => {
+    if (kind === 'order') {
+      return {
+        roomNumber: r.roomNumber, roomType: r.roomType || '', source: r.source || '',
+        adult: r.adult, child: r.child, infant: r.infant,
+        orderId: r.orderId || '', guestName: r.guestName || ''
+      };
+    }
+    if (kind === 'breakfast8') {
+      return {
+        roomNumber: r.roomNumber, source: r.source || '', status: r.status || '',
+        eggMilk: r.eggMilk || '', vegan: r.vegan || '', adult: r.adult || '',
+        child: r.child || '', mealTime: r.mealTime || '',
+        raw: Array.isArray(r.raw) ? r.raw.slice(0, 8) : []
+      };
+    }
+    return { roomNumber: r.roomNumber, breakfastType: r.breakfastType || '', rawType: r.rawType || '' };
+  });
+  return { at: new Date().toISOString(), kind, rows: slim, issues: (draft.issues || []).slice(0, 100) };
+}
+
+function openLastImport() {
+  const snap = state.lastImport;
+  const summary = $('lastImportSummary');
+  const issues = $('lastImportIssues');
+  const list = $('lastImportList');
+  if (!snap) {
+    summary.textContent = '尚無匯入紀錄';
+    issues.innerHTML = '';
+    list.innerHTML = '<div class="hint" style="padding:18px;text-align:center">匯入資料後，即可在這裡核對上傳的欄位內容。</div>';
+    closeModal('menuModal');
+    openModal('lastImportModal');
+    return;
+  }
+  const kindLabel = snap.kind === 'order' ? '新訂單格式（I~M）' : snap.kind === 'breakfast8' ? '早餐統計 8 欄' : '簡易房號（Excel / CSV）';
+  const at = snap.at ? new Date(snap.at).toLocaleString('zh-TW', { hour12: false }) : '—';
+  const rows = snap.rows || [];
+  summary.innerHTML = `匯入時間：<b>${escapeHtml(at)}</b><br>格式：<b>${kindLabel}</b>　共 <b>${rows.length}</b> 筆`;
+  issues.innerHTML = (snap.issues || []).length
+    ? `<div class="issue">⚠️ 匯入提示 ${snap.issues.length} 項：${escapeHtml(snap.issues.slice(0, 5).join('；'))}${snap.issues.length > 5 ? '…' : ''}</div>`
+    : '';
+  let html = '';
+  if (snap.kind === 'order') {
+    html = '<table class="last-import-table"><thead><tr><th>房號</th><th>房型</th><th>來源</th><th>大人</th><th>孩童</th><th>嬰幼兒</th><th>訂單編號</th><th>顧客</th></tr></thead><tbody>'
+      + rows.map(r => `<tr><td><b>${escapeHtml(r.roomNumber)}</b></td><td>${escapeHtml(r.roomType)}</td><td>${escapeHtml(r.source)}</td><td>${escapeHtml(r.adult)}</td><td>${escapeHtml(r.child)}</td><td>${escapeHtml(r.infant)}</td><td>${escapeHtml(r.orderId)}</td><td>${escapeHtml(r.guestName)}</td></tr>`).join('')
+      + '</tbody></table>';
+  } else if (snap.kind === 'breakfast8') {
+    html = '<table class="last-import-table"><thead><tr><th>房號</th><th>來源</th><th>狀態</th><th>蛋奶素</th><th>全素</th><th>大人</th><th>小孩</th><th>時間</th><th>原始 B~H</th></tr></thead><tbody>'
+      + rows.map(r => {
+        const raw = Array.isArray(r.raw) ? r.raw.slice(1, 8).join('｜') : '';
+        return `<tr><td><b>${escapeHtml(r.roomNumber)}</b></td><td>${escapeHtml(r.source)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.eggMilk)}</td><td>${escapeHtml(r.vegan)}</td><td>${escapeHtml(r.adult)}</td><td>${escapeHtml(r.child)}</td><td>${escapeHtml(r.mealTime)}</td><td class="raw-cell">${escapeHtml(raw)}</td></tr>`;
+      }).join('')
+      + '</tbody></table>';
+  } else {
+    html = '<table class="last-import-table"><thead><tr><th>房號</th><th>早餐種類</th><th>原始值</th></tr></thead><tbody>'
+      + rows.map(r => {
+        const info = typeInfo(r.breakfastType);
+        return `<tr><td><b>${escapeHtml(r.roomNumber)}</b></td><td>${info.emoji} ${escapeHtml(info.label)}</td><td>${escapeHtml(r.rawType)}</td></tr>`;
+      }).join('')
+      + '</tbody></table>';
+  }
+  list.innerHTML = `<div class="last-import-wrap">${html}</div><p class="hint" style="margin:10px 0 0">此為匯入當時的內容；畫面上的資料若已手動修改，以畫面為準。</p>`;
+  closeModal('menuModal');
+  openModal('lastImportModal');
+}
+
 function confirmImport() {
   if (!importDraft) return;
   if (importDraft.isOrder) {
@@ -1246,6 +1333,7 @@ function confirmImport() {
   } else {
     state.rooms = sortRooms(importDraft.rows.map(r => ({ roomNumber: r.roomNumber, breakfastType: r.breakfastType, orderId: r.orderId || '' })));
   }
+  state.lastImport = makeImportSnapshot(importDraft);
   saveState();
   const imported = state.rooms.length;
   // 先把視窗關掉再重畫：即使 render 出錯也不會卡在「視窗不關」的誤導狀態
@@ -1479,6 +1567,8 @@ function bindEvents() {
   $('menuCloseBtn').addEventListener('click', () => closeModal('menuModal'));
   $('menuManageBtn').addEventListener('click', () => { closeModal('menuModal'); openManage(); });
   $('menuImportBtn').addEventListener('click', () => { closeModal('menuModal'); $('fileInput').click(); });
+  $('menuLastImportBtn').addEventListener('click', openLastImport);
+  $('lastImportCloseBtn').addEventListener('click', () => closeModal('lastImportModal'));
   $('menuClearBtn').addEventListener('click', () => { closeModal('menuModal'); openClearConfirm(); });
   $('clearCancelBtn').addEventListener('click', () => closeModal('clearModal'));
   $('clearConfirmBtn').addEventListener('click', doClearRooms);

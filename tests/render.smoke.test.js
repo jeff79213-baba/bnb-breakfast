@@ -76,7 +76,8 @@ function bootApp() {
   render, renderGrid, filterRooms, todayKey,
   isOrderMode, isBreakfast8Mode, noteStar,
   openNoteModal, saveNoteModal, getNote, countNotesToday, clearTodayNotes,
-  openVersionModal, APP_VERSION, CHANGELOG
+  openVersionModal, APP_VERSION, CHANGELOG,
+  openLastImport, makeImportSnapshot
 };
 `;
   vm.runInContext(appSrc, sandbox, { filename: 'app.js' });
@@ -146,6 +147,48 @@ test('新訂單模式：renderOrderGrid 正常', () => {
   assert.strictEqual(P.isOrderMode(), true);
   assert.doesNotThrow(() => P.render());
   assert.ok(grid.innerHTML.includes('301'));
+});
+
+test('新訂單模式：排序「尚未用餐」把未用餐排前面', () => {
+  const s = mkState([
+    { roomNumber: '301', source: '手動訂單', adult: 1, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A1' },
+    { roomNumber: '302', source: '官網', adult: 2, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A2' },
+  ]);
+  s.settings.sortMode = 'pending';
+  s.daily = { [tk]: { '301': 'completed' } };
+  P.setState(s);
+  assert.doesNotThrow(() => P.render());
+  assert.ok(grid.innerHTML.indexOf('302') < grid.innerHTML.indexOf('301'), '未用餐 302 應排在已用餐 301 前面');
+});
+
+test('查看匯入資料：沒有紀錄時顯示提示，不當機', () => {
+  const s = mkState([]);
+  s.lastImport = null;
+  P.setState(s);
+  assert.doesNotThrow(() => P.openLastImport());
+  assert.ok(els['lastImportSummary'].textContent.includes('尚無匯入紀錄'));
+});
+
+test('查看匯入資料：8 欄快照顯示欄位與原始 B~H', () => {
+  const snap = P.makeImportSnapshot({
+    isBreakfast8: true,
+    rows: [{
+      roomNumber: '201', source: '官網', status: '續住', eggMilk: '', vegan: '不加購',
+      adult: '2', child: '1', mealTime: '08:00',
+      raw: ['', '201', '官網', '續住', '不', '加', '購', '08:00'],
+    }],
+    issues: ['第 9 列：房號 999 重複'],
+  });
+  const s = mkState([]);
+  s.lastImport = snap;
+  P.setState(s);
+  assert.doesNotThrow(() => P.openLastImport());
+  const list = els['lastImportList'].innerHTML;
+  assert.ok(els['lastImportSummary'].innerHTML.includes('早餐統計 8 欄'));
+  assert.ok(list.includes('201'));
+  assert.ok(list.includes('續住'));
+  assert.ok(list.includes('續住｜不｜加｜購｜08:00'), '應顯示原始 B~H 欄位');
+  assert.ok(els['lastImportIssues'].innerHTML.includes('第 9 列'));
 });
 
 test('混合資料（37 間新訂單 + 手動加 101）：some 判斷不讓整頁掉回卡片', () => {

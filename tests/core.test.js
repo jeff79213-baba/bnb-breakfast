@@ -337,6 +337,32 @@ test('sortRoomsByMealTime: 空／undefined 輸入回傳 []', () => {
   assert.deepStrictEqual(C.sortRoomsByMealTime(undefined), []);
 });
 
+test('sortRoomsPendingFirst: 未用餐在前、已用餐在後，同組依房號', () => {
+  const rooms = [
+    { roomNumber: '105' }, { roomNumber: '101' }, { roomNumber: '103' },
+    { roomNumber: '102' }, { roomNumber: '104' },
+  ];
+  const done = new Set(['101', '103']);
+  assert.deepStrictEqual(
+    C.sortRoomsPendingFirst(rooms, r => done.has(r.roomNumber)).map(r => r.roomNumber),
+    ['102', '104', '105', '101', '103']
+  );
+});
+
+test('sortRoomsPendingFirst: 未提供判斷函式視為全部未完成（依房號）', () => {
+  const rooms = [{ roomNumber: '205' }, { roomNumber: '101' }];
+  assert.deepStrictEqual(C.sortRoomsPendingFirst(rooms).map(r => r.roomNumber), ['101', '205']);
+});
+
+test('sortRoomsPendingFirst: 不修改原陣列、空輸入回傳 []', () => {
+  const rooms = [{ roomNumber: '101' }, { roomNumber: '102' }];
+  const copy = rooms.map(r => r.roomNumber);
+  C.sortRoomsPendingFirst(rooms, r => r.roomNumber === '101');
+  assert.deepStrictEqual(rooms.map(r => r.roomNumber), copy);
+  assert.deepStrictEqual(C.sortRoomsPendingFirst([]), []);
+  assert.deepStrictEqual(C.sortRoomsPendingFirst(undefined), []);
+});
+
 // ===== 房號備註 =====
 
 test('noteGet: 缺值一律回空字串', () => {
