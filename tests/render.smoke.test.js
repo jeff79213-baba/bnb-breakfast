@@ -200,7 +200,7 @@ test('文字指令：批次解析後顯示確認表，確認才套用', () => {
     { roomNumber: '202', source: '官網', adult: 2, child: 0, infant: 0, mealTime: '', breakfastType: 'hot', orderId: 'A2' },
   ]));
   P.openCmdModal();
-  els['cmdInput'].value = '201 2大1小 加購 蛋奶\n202 不用餐';
+  els['cmdInput'].value = '201 2大1小 加購 蛋奶 0830\n202 不用餐';
   P.parseCmdInput();
   const draft = P.getCmdDraft();
   assert.ok(Array.isArray(draft) && draft.length === 2, '應解析出兩間房');
@@ -212,6 +212,7 @@ test('文字指令：批次解析後顯示確認表，確認才套用', () => {
   assert.strictEqual(s.rooms.find(r => r.roomNumber === '201').adult, 2);
   assert.strictEqual(s.rooms.find(r => r.roomNumber === '201').child, 1);
   assert.strictEqual(s.rooms.find(r => r.roomNumber === '201').eggMilk, '蛋奶加購');
+  assert.strictEqual(s.rooms.find(r => r.roomNumber === '201').mealTime, '08:30');
   assert.strictEqual(s.rooms.find(r => r.roomNumber === '202').mealTime, '不用餐');
 });
 

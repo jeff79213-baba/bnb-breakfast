@@ -1,5 +1,5 @@
 /* 民宿早餐房號管理系統 - Service Worker（離線快取） */
-const CACHE_NAME = 'bnb-breakfast-v27-text-command';
+const CACHE_NAME = 'bnb-breakfast-v28-command-room-first';
 const APP_SHELL = [
   './',
   './index.html',

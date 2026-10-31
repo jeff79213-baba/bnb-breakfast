@@ -129,8 +129,12 @@ function sanitizeRooms(rooms) {
 }
 
 // ===== 版本紀錄（改版時同步更新 APP_VERSION、CHANGELOG、sw.js 的 CACHE_NAME）=====
-const APP_VERSION = 'v27';
+const APP_VERSION = 'v28';
 const CHANGELOG = [
+  { v: 'v28', date: '2026-10-31', items: [
+    '調整：文字指令的房號必須是句子裡第一個數字，不用再說後面的 N',
+    '新增：後面單獨的 4 位數字視為用餐時間（例：0830 = 08:30）'
+  ] },
   { v: 'v27', date: '2026-10-31', items: [
     '新增：功能選單「文字指令」——一次輸入多行，一行一間房，順序不限',
     '支援：幾大幾小、加購／不加購、全素／蛋奶、不用餐／要用餐、用餐時間、已吃／未吃',

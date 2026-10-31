@@ -372,8 +372,8 @@ const CMD_ROOMS = [
   { roomNumber: '204', source: '官網', adult: 2, child: 0, infant: 0, eggMilk: '', vegan: '', mealTime: '不用餐', breakfastType: 'normal' },
 ];
 
-test('parseRoomCommand: 順序不限，抓房號／人數／加購／蛋奶', () => {
-  const r = C.parseRoomCommand('加購 蛋奶 2大1小 201', CMD_ROOMS);
+test('parseRoomCommand: 房號放最前面，其他順序不限', () => {
+  const r = C.parseRoomCommand('201 加購 蛋奶 2大1小', CMD_ROOMS);
   assert.strictEqual(r.ok, true);
   assert.strictEqual(r.roomNumber, '201');
   assert.strictEqual(r.patch.adult, 2);
@@ -424,17 +424,35 @@ test('parseRoomCommand: 不用餐與恢復用餐', () => {
   assert.strictEqual(b.patch.mealTime, '');
 });
 
-test('parseRoomCommand: 時間支援 8:30／8點半／08:30', () => {
-  for (const text of ['201 8:30', '201 8點半', '201 08:30']) {
+test('parseRoomCommand: 時間支援 8:30／8點半／08:30／後面 4 位數字 0830', () => {
+  for (const text of ['201 8:30', '201 8點半', '201 08:30', '201 2大1小 0830']) {
     const r = C.parseRoomCommand(text, CMD_ROOMS);
     assert.strictEqual(r.ok, true, text);
     assert.strictEqual(r.patch.mealTime, '08:30', text);
   }
 });
 
+test('parseRoomCommand: 房號一定要是句子裡第一個數字', () => {
+  const r = C.parseRoomCommand('2大1小 加購 201', CMD_ROOMS);
+  assert.strictEqual(r.ok, false);
+  assert.ok(r.errors.some(e => e.includes('最前面')));
+});
+
 test('parseRoomCommand: 已吃／未吃寫入用餐狀態', () => {
   assert.strictEqual(C.parseRoomCommand('201 已吃', CMD_ROOMS).dailyStatus, 'completed');
   assert.strictEqual(C.parseRoomCommand('201 未用餐', CMD_ROOMS).dailyStatus, 'pending');
+});
+
+test('parseRoomCommand: 房號後面的 N 可講可不講', () => {
+  const withN = [{ roomNumber: '201N', source: '官網', adult: 1, child: 0, infant: 0, eggMilk: '', vegan: '', mealTime: '', breakfastType: 'hot' }];
+  const a = C.parseRoomCommand('201 2大1小', withN);
+  assert.strictEqual(a.ok, true);
+  assert.strictEqual(a.roomNumber, '201N');
+  assert.strictEqual(a.room, withN[0]);
+  const withoutN = [{ roomNumber: '201', source: '官網', adult: 1, child: 0, infant: 0, eggMilk: '', vegan: '', mealTime: '', breakfastType: 'hot' }];
+  const b = C.parseRoomCommand('201N 2大1小', withoutN);
+  assert.strictEqual(b.ok, true);
+  assert.strictEqual(b.roomNumber, '201');
 });
 
 test('parseRoomCommand: 房號不存在／找不到房號／沒有動作都要擋下', () => {
@@ -466,6 +484,15 @@ test('splitRoomCommands: 換行、分號、連續多房都能拆', () => {
   assert.deepStrictEqual(
     C.splitRoomCommands('201 2大1小 202 不用餐 203 08:30'),
     ['201 2大1小', '202 不用餐', '203 08:30']
+  );
+  assert.deepStrictEqual(
+    C.splitRoomCommands('201 2大1小 0830'),
+    ['201 2大1小 0830'],
+    '後面的 4 位數字是時間，不能拆成另一間房'
+  );
+  assert.deepStrictEqual(
+    C.splitRoomCommands('201 0830 202 0900'),
+    ['201 0830', '202 0900']
   );
 });
 

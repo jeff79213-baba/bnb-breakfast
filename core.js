@@ -225,19 +225,33 @@
     return n;
   }
 
-  // 一行可能連續講了好幾間房（201 ... 202 ...），用 3~4 位房號自動拆句
+  // 抓出句中的 3~4 位房號 token（可帶 N）
+  function roomTokens(text) {
+    const re = /(?:^|[^\d])(\d{3,4})([Nn])?(?!\d)/g;
+    const out = [];
+    let m;
+    while ((m = re.exec(text))) {
+      const no = m[1] + (m[2] ? 'N' : '');
+      out.push({ at: m.index + (m[0].length - no.length), no, digits: m[1], hasN: !!m[2] });
+    }
+    return out;
+  }
+
+  // 一行可能連續講了好幾間房（201 ... 202 ...），用 3 位房號自動拆句；
+  // 後面單獨出現的 4 位數字視為用餐時間（例：0830 = 08:30），不當房號。
   function splitRoomCommands(text) {
     const lines = String(text == null ? '' : text).replace(/\r/g, '').split(/\n|[;；]/);
     const out = [];
     for (const raw of lines) {
       const line = normalizeCommandText(raw).trim();
       if (!line) continue;
-      const re = /(?:^|[^\d])(\d{3,4})([Nn])?(?!\d)/g;
-      const starts = [];
-      let m;
-      while ((m = re.exec(line))) {
-        const no = m[1] + (m[2] ? 'N' : '');
-        starts.push({ at: m.index + (m[0].length - no.length), no });
+      const tokens = roomTokens(line);
+      if (!tokens.length) { out.push(line); continue; }
+      const starts = [tokens[0]];
+      for (let i = 1; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (t.digits.length === 4 && !t.hasN) continue;
+        starts.push(t);
       }
       if (starts.length <= 1) { out.push(line); continue; }
       for (let i = 0; i < starts.length; i++) {
@@ -274,22 +288,34 @@
   function parseRoomCommand(line, rooms) {
     const text = normalizeCommandText(line).trim();
     const errors = [];
-    const roomRe = /(?:^|[^\d])(\d{3,4})([Nn])?(?!\d)/g;
-    const matches = [...text.matchAll(roomRe)];
-    if (!matches.length) return { ok: false, line, errors: ['找不到房號（請輸入 3~4 位數字）'] };
-    if (matches.length > 1) return { ok: false, line, errors: ['一句只能一間房，請分行輸入'] };
-    const m = matches[0];
-    const roomNumber = m[1] + (m[2] ? 'N' : '');
-    const room = (rooms || []).find(r => String(r && r.roomNumber != null ? r.roomNumber : '').trim() === roomNumber);
-    if (!room) return { ok: false, line, roomNumber, errors: [`房號 ${roomNumber} 不在目前清單`] };
+    const tokens = roomTokens(text);
+    const firstNum = text.match(/\d+/);
+    if (!firstNum) return { ok: false, line, errors: ['找不到房號（請把 3~4 位房號放在最前面）'] };
+    if (firstNum[0].length < 3 || firstNum[0].length > 4) {
+      return { ok: false, line, errors: ['房號要放在最前面（3~4 位數字），例：201 2大1小'] };
+    }
+    if (!tokens.length) return { ok: false, line, errors: ['找不到房號（請把 3~4 位房號放在最前面）'] };
+    const first = tokens[0];
+    const inputRoomNumber = first.no;
+    const extraRooms = tokens.slice(1).filter(t => t.digits.length !== 4 || t.hasN);
+    if (extraRooms.length) return { ok: false, line, roomNumber: inputRoomNumber, errors: ['一句只能一間房，請分行輸入'] };
+    const roomKey = v => String(v == null ? '' : v).trim().replace(/[Nn]$/, '');
+    const roomOf = r => String(r && r.roomNumber != null ? r.roomNumber : '').trim();
+    const room = (rooms || []).find(r => roomOf(r) === inputRoomNumber)
+      || (rooms || []).find(r => roomKey(roomOf(r)) === roomKey(inputRoomNumber));
+    if (!room) return { ok: false, line, roomNumber: inputRoomNumber, errors: [`房號 ${inputRoomNumber} 不在目前清單`] };
+    const roomNumber = roomOf(room);
+
+    // 房號已抓出，其餘文字才拿來判斷人數／餐點／時間，避免把房號數字誤當時間
+    const rest = (text.slice(0, first.at) + ' ' + text.slice(first.at + first.no.length)).trim();
 
     // 人數（中文數字也支援：二大一小）
-    const adultVals = collectCounts(text, new RegExp(`(${CN_NUM})\\s*(?:個)?\\s*(?:大人|成人|大)`, 'g'))
-      .concat(collectCounts(text, new RegExp(`(?:大人|成人)\\s*(${CN_NUM})\\s*(?:位|人)?`, 'g')));
-    const childVals = collectCounts(text, new RegExp(`(${CN_NUM})\\s*(?:個)?\\s*(?:小孩|孩童|小朋友|兒童|童|小)`, 'g'))
-      .concat(collectCounts(text, new RegExp(`(?:小孩|孩童|小朋友|兒童)\\s*(${CN_NUM})\\s*(?:位|人)?`, 'g')));
-    const infantVals = collectCounts(text, new RegExp(`(${CN_NUM})\\s*(?:個)?\\s*(?:嬰幼兒|嬰兒|寶寶|嬰)`, 'g'))
-      .concat(collectCounts(text, new RegExp(`(?:嬰幼兒|嬰兒|寶寶)\\s*(${CN_NUM})\\s*(?:位|人)?`, 'g')));
+    const adultVals = collectCounts(rest, new RegExp(`(${CN_NUM})\\s*(?:個)?\\s*(?:大人|成人|大)`, 'g'))
+      .concat(collectCounts(rest, new RegExp(`(?:大人|成人)\\s*(${CN_NUM})\\s*(?:位|人)?`, 'g')));
+    const childVals = collectCounts(rest, new RegExp(`(${CN_NUM})\\s*(?:個)?\\s*(?:小孩|孩童|小朋友|兒童|童|小)`, 'g'))
+      .concat(collectCounts(rest, new RegExp(`(?:小孩|孩童|小朋友|兒童)\\s*(${CN_NUM})\\s*(?:位|人)?`, 'g')));
+    const infantVals = collectCounts(rest, new RegExp(`(${CN_NUM})\\s*(?:個)?\\s*(?:嬰幼兒|嬰兒|寶寶|嬰)`, 'g'))
+      .concat(collectCounts(rest, new RegExp(`(?:嬰幼兒|嬰兒|寶寶)\\s*(${CN_NUM})\\s*(?:位|人)?`, 'g')));
     const uniq = arr => [...new Set(arr)];
     const adultU = uniq(adultVals), childU = uniq(childVals), infantU = uniq(infantVals);
     if (adultU.length > 1) errors.push('大人數量不明確');
@@ -297,20 +323,20 @@
     if (infantU.length > 1) errors.push('嬰幼兒數量不明確');
     let adult = adultU[0] ?? null, child = childU[0] ?? null, infant = infantU[0] ?? null;
     if (adult == null && child == null && infant == null) {
-      const people = uniq(collectCounts(text, new RegExp(`(${CN_NUM})\\s*(?:人|位)`, 'g')));
+      const people = uniq(collectCounts(rest, new RegExp(`(${CN_NUM})\\s*(?:人|位)`, 'g')));
       if (people.length === 1) adult = people[0];
       else if (people.length > 1) errors.push('人數不明確');
     }
 
     // 加購 / 不加購
     const addonFlags = [];
-    for (const a of text.matchAll(/(不|不要|不用|免)?\s*加購/g)) addonFlags.push(a[1] ? false : true);
+    for (const a of rest.matchAll(/(不|不要|不用|免)?\s*加購/g)) addonFlags.push(a[1] ? false : true);
     const addonU = uniq(addonFlags);
     if (addonU.length > 1) errors.push('加購與不加購同時出現');
     const addon = addonU.length === 1 ? addonU[0] : null;
 
     // 素食種類（先移除「正常用餐」避免誤判）
-    const mealText = text.replace(/(?:要|恢復|正常)\s*用餐/g, '');
+    const mealText = rest.replace(/(?:要|恢復|正常)\s*用餐/g, '');
     const isFull = /全素|純素/.test(mealText);
     const isEgg = /蛋奶(?:素)?/.test(mealText);
     const isNormal = /正常|葷食|葷/.test(mealText);
@@ -318,25 +344,29 @@
     const vegType = isFull ? '全素' : isEgg ? '蛋奶' : isNormal ? '正常' : (/素食|吃素/.test(mealText) ? '蛋奶' : null);
 
     // 用餐 / 不用餐
-    const noMeal = /不用餐|不餐|不吃|不用吃/.test(text);
-    const wantMeal = /(?:要|恢復|正常)\s*用餐|要用餐|恢復用餐/.test(text);
+    const noMeal = /不用餐|不餐|不吃|不用吃/.test(rest);
+    const wantMeal = /(?:要|恢復|正常)\s*用餐|要用餐|恢復用餐/.test(rest);
     if (noMeal && wantMeal) errors.push('不用餐與要用餐同時出現');
 
-    // 時間：8:30、08:30、8點半、8點30分
+    // 時間：8:30、08:30、8點半、8點30分，或後面單獨的 4 位數字 0830
     let time = null;
-    let tm = text.match(/(\d{1,2})\s*:\s*(\d{1,2})/);
-    let hour = null, minute = null;
+    let tm = rest.match(/(\d{1,2})\s*:\s*(\d{1,2})/);
+    let hour = null, minute = null, compact = false;
     if (tm) { hour = Number(tm[1]); minute = Number(tm[2]); }
     else {
-      tm = text.match(/(\d{1,2})\s*點\s*(半|\d{1,2}\s*分?)?/);
+      tm = rest.match(/(\d{1,2})\s*點\s*(半|\d{1,2}\s*分?)?/);
       if (tm) {
         hour = Number(tm[1]);
         minute = tm[2] === '半' ? 30 : (tm[2] ? parseInt(tm[2], 10) : 0);
+      } else {
+        tm = rest.match(/(?:^|[^\d])(\d{2})(\d{2})(?!\d)/);
+        if (tm) { hour = Number(tm[1]); minute = Number(tm[2]); compact = true; }
       }
     }
     if (tm) {
-      if (hour < 1 || hour > 12 || minute < 0 || minute > 59 || minute % 5 !== 0) {
-        errors.push('用餐時間請用 1~12 點、5 分鐘為單位');
+      const hourOk = compact ? (hour >= 0 && hour <= 23) : (hour >= 1 && hour <= 12);
+      if (!hourOk || minute < 0 || minute > 59 || minute % 5 !== 0) {
+        errors.push(compact ? '用餐時間請用 4 位數字（例：0830）、5 分鐘為單位' : '用餐時間請用 1~12 點、5 分鐘為單位');
       } else {
         time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
       }

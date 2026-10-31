@@ -158,8 +158,8 @@
   <div class="sheet tall">
     <div class="sheet-handle"></div>
     <h2>⌨️ 文字指令</h2>
-    <p class="hint">一行一間房，順序不限。例如：<br>201 2大1小 加購 蛋奶<br>202 不用餐<br>203 08:30 全素</p>
-    <textarea id="cmdInput" class="cmd-input" rows="7" placeholder="一行一間房，例如：&#10;201 2大1小 加購 蛋奶&#10;202 不用餐&#10;203 08:30 全素"></textarea>
+    <p class="hint">一行一間房，房號放最前面，後面順序不限。<br>後面的 4 位數字是時間（0830 = 08:30）。<br>例如：<br>201 2大1小 加購 蛋奶 0830<br>202 不用餐<br>203 全素</p>
+    <textarea id="cmdInput" class="cmd-input" rows="7" placeholder="一行一間房，房號放最前面，例如：&#10;201 2大1小 加購 蛋奶 0830&#10;202 不用餐&#10;203 全素"></textarea>
     <div class="row-actions">
       <button class="btn" id="cmdClearBtn">清空</button>
       <button class="btn primary" id="cmdParseBtn">解析並預覽</button>
